@@ -585,7 +585,20 @@
         <div class="split">
           <div class="card">
             <h2>收費紀錄</h2>
-            <div class="muted">你可以手動登記每一筆月租收款。家人自用若不收費，也可以不建立紀錄。</div>
+            <div class="muted">你可以手動登記每一筆月租收款。家人自用若不收費，也可以不建立紀錄。下面也能一鍵匯出月報表與年報表 CSV，讓會計對帳省很多力氣。</div>
+            <div class="filter-row" style="margin: 14px 0 10px;">
+              <label>月報表月份
+                <input type="month" id="reportMonth" />
+              </label>
+              <label>年報表年份
+                <select id="reportYear"></select>
+              </label>
+            </div>
+            <div class="inline-actions" style="margin-bottom: 12px;">
+              <button class="btn-light" id="exportMonthCsvBtn">匯出月報表 CSV</button>
+              <button class="btn-light" id="exportYearCsvBtn">匯出年報表 CSV</button>
+            </div>
+            <div class="footer-note" style="margin-top: 0;">CSV 會用 Excel 比較友善的格式輸出，包含報表摘要和收費明細，拿去對帳會比較順。</div>
             <div class="table-wrap">
               <table>
                 <thead>
@@ -607,6 +620,7 @@
           <div class="card">
             <h2>收費摘要</h2>
             <div class="stats" id="paymentStats"></div>
+            <div id="reportStats"></div>
             <div class="footer-note">這版會優先把資料同步到雲端。你也可以照樣匯出 JSON，當成額外保險箱。</div>
           </div>
         </div>
@@ -750,6 +764,7 @@
     const today = new Date();
     const todayStr = toDateInputValue(today);
     const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    const currentYearStr = String(today.getFullYear());
 
     let state = defaultState();
     let currentUser = null;
@@ -883,6 +898,8 @@
       renderTenantList();
       renderPaymentTable();
       renderPaymentStats();
+      syncReportControls();
+      renderReportSummary();
       syncSettingsUI();
       fillSpotOptions();
       fillPaymentTenantOptions();
@@ -1048,6 +1065,181 @@
         <div class="card stat-card"><h3>本月已收</h3><div class="value" style="font-size:28px;">${formatCurrency(thisMonthTotal)}</div><div class="desc">${currentMonthStr} 的紀錄總額</div></div>
         <div class="card stat-card"><h3>累計收款</h3><div class="value" style="font-size:28px;">${formatCurrency(overallTotal)}</div><div class="desc">所有歷史收費合計</div></div>
         <div class="card stat-card"><h3>收費筆數</h3><div class="value">${paymentCount}</div><div class="desc">目前已建立的紀錄數</div></div>
+      `;
+    }
+
+    function syncReportControls() {
+      const monthInput = document.getElementById('reportMonth');
+      const yearSelect = document.getElementById('reportYear');
+      if (!monthInput.value) monthInput.value = currentMonthStr;
+
+      const yearSet = new Set([currentYearStr]);
+      state.payments.forEach(p => {
+        if (p.paymentMonth && /^\d{4}-\d{2}$/.test(p.paymentMonth)) {
+          yearSet.add(p.paymentMonth.slice(0, 4));
+        }
+      });
+      const years = Array.from(yearSet).sort((a, b) => Number(b) - Number(a));
+      const selectedYear = yearSelect.value || currentYearStr;
+      yearSelect.innerHTML = years.map(year => `<option value="${year}">${year} 年</option>`).join('');
+      yearSelect.value = years.includes(selectedYear) ? selectedYear : years[0];
+    }
+
+    function getReportMonthRecords(monthValue) {
+      return [...state.payments]
+        .filter(p => p.paymentMonth === monthValue)
+        .sort((a, b) => `${a.paymentDate || ''}${a.paymentMonth || ''}`.localeCompare(`${b.paymentDate || ''}${b.paymentMonth || ''}`));
+    }
+
+    function getReportYearRecords(yearValue) {
+      return [...state.payments]
+        .filter(p => (p.paymentMonth || '').startsWith(yearValue + '-'))
+        .sort((a, b) => {
+          const keyA = `${a.paymentMonth || ''}-${a.paymentDate || ''}`;
+          const keyB = `${b.paymentMonth || ''}-${b.paymentDate || ''}`;
+          return keyA.localeCompare(keyB);
+        });
+    }
+
+    function getTenantLabelType(tenant) {
+      return tenant?.tenantType === 'family' ? '家人自用' : '一般月租';
+    }
+
+    function formatDateTime(date) {
+      const d = new Date(date);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      return `${y}/${m}/${day} ${hh}:${mm}`;
+    }
+
+    function csvEscape(value) {
+      const str = String(value ?? '');
+      return `"${str.replaceAll('"', '""')}"`;
+    }
+
+    function downloadCsv(filename, rows) {
+      const csv = '\ufeff' + rows.map(row => row.map(csvEscape).join(',')).join('\r\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function exportMonthlyReportCsv() {
+      const monthValue = document.getElementById('reportMonth').value || currentMonthStr;
+      const rows = getReportMonthRecords(monthValue);
+      const total = rows.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const [year, month] = monthValue.split('-');
+      const csvRows = [
+        [`${state.settings.lotName} 月報表`],
+        ['報表期間', `${year} 年 ${Number(month)} 月`],
+        ['匯出時間', formatDateTime(new Date())],
+        ['收費筆數', rows.length],
+        ['月收入合計', total],
+        [],
+        ['收費月份', '租戶', '租戶類型', '車位', '車牌', '金額', '收款日', '收款方式', '備註'],
+      ];
+
+      rows.forEach(p => {
+        const tenant = state.tenants.find(t => t.id === p.tenantId);
+        csvRows.push([
+          p.paymentMonth || '',
+          tenant?.name || '已刪除租戶',
+          getTenantLabelType(tenant),
+          tenant?.spotNumber || '',
+          tenant?.plate || '',
+          Number(p.amount || 0),
+          p.paymentDate || '',
+          p.paymentMethod || '',
+          p.note || '',
+        ]);
+      });
+
+      downloadCsv(`${state.settings.lotName}_${year}-${month}_月報表.csv`, csvRows);
+      showToast(`已匯出 ${year} 年 ${Number(month)} 月報表`);
+    }
+
+    function exportYearlyReportCsv() {
+      const yearValue = document.getElementById('reportYear').value || currentYearStr;
+      const rows = getReportYearRecords(yearValue);
+      const total = rows.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const monthlySummary = Array.from({ length: 12 }, (_, index) => {
+        const month = String(index + 1).padStart(2, '0');
+        const monthKey = `${yearValue}-${month}`;
+        const monthRows = rows.filter(p => p.paymentMonth === monthKey);
+        return {
+          month: `${Number(month)} 月`,
+          count: monthRows.length,
+          total: monthRows.reduce((sum, p) => sum + Number(p.amount || 0), 0),
+        };
+      });
+
+      const csvRows = [
+        [`${state.settings.lotName} 年報表`],
+        ['報表年度', `${yearValue} 年`],
+        ['匯出時間', formatDateTime(new Date())],
+        ['收費筆數', rows.length],
+        ['年度收入合計', total],
+        [],
+        ['每月彙總'],
+        ['月份', '收費筆數', '月收入'],
+        ...monthlySummary.map(item => [item.month, item.count, item.total]),
+        [],
+        ['收費明細'],
+        ['收費月份', '租戶', '租戶類型', '車位', '車牌', '金額', '收款日', '收款方式', '備註'],
+      ];
+
+      rows.forEach(p => {
+        const tenant = state.tenants.find(t => t.id === p.tenantId);
+        csvRows.push([
+          p.paymentMonth || '',
+          tenant?.name || '已刪除租戶',
+          getTenantLabelType(tenant),
+          tenant?.spotNumber || '',
+          tenant?.plate || '',
+          Number(p.amount || 0),
+          p.paymentDate || '',
+          p.paymentMethod || '',
+          p.note || '',
+        ]);
+      });
+
+      downloadCsv(`${state.settings.lotName}_${yearValue}_年報表.csv`, csvRows);
+      showToast(`已匯出 ${yearValue} 年報表`);
+    }
+
+    function renderReportSummary() {
+      const monthValue = document.getElementById('reportMonth')?.value || currentMonthStr;
+      const yearValue = document.getElementById('reportYear')?.value || currentYearStr;
+      const monthRows = getReportMonthRecords(monthValue);
+      const yearRows = getReportYearRecords(yearValue);
+      const monthTotal = monthRows.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const yearTotal = yearRows.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const reportStats = document.getElementById('reportStats');
+      if (!reportStats) return;
+      reportStats.innerHTML = `
+        <div class="tenant-item" style="margin-top: 6px;">
+          <div class="tenant-head">
+            <div>
+              <div class="tenant-name">報表匯出預覽</div>
+              <div class="meta">讓會計先快速看一下本月與本年合計，確認沒問題再一鍵下載。</div>
+            </div>
+          </div>
+          <div class="meta">
+            月報表期間：${monthValue.replace('-', ' 年 ')} 月<br>
+            月報表筆數：${monthRows.length} 筆<br>
+            月報表合計：${formatCurrency(monthTotal)}<br><br>
+            年報表期間：${yearValue} 年<br>
+            年報表筆數：${yearRows.length} 筆<br>
+            年報表合計：${formatCurrency(yearTotal)}
+          </div>
+        </div>
       `;
     }
 
@@ -1448,6 +1640,10 @@
     });
 
     document.getElementById('exportBtn').addEventListener('click', exportBackup);
+    document.getElementById('exportMonthCsvBtn').addEventListener('click', exportMonthlyReportCsv);
+    document.getElementById('exportYearCsvBtn').addEventListener('click', exportYearlyReportCsv);
+    document.getElementById('reportMonth').addEventListener('change', renderReportSummary);
+    document.getElementById('reportYear').addEventListener('change', renderReportSummary);
     document.getElementById('importFile').addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
