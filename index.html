@@ -1064,10 +1064,10 @@
       for (const spotNo of SPOT_NUMBERS) {
         const occupiedBy = getSpotTenant(spotNo);
         const option = document.createElement('option');
-        option.value = i;
-        option.textContent = occupiedBy ? `${i} 號（已被 ${occupiedBy.name} 使用）` : `${i} 號`;
+        option.value = spotNo;
+        option.textContent = occupiedBy ? `${spotNo} 號（已被 ${occupiedBy.name} 使用）` : `${spotNo} 號`;
         option.disabled = Boolean(occupiedBy && String(occupiedBy.id) !== String(document.getElementById('tenantId').value || ''));
-        if (String(i) === String(selected)) option.selected = true;
+        if (String(spotNo) === String(selected)) option.selected = true;
         select.appendChild(option);
       }
     }
