@@ -1,0 +1,1504 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>何家月租停車場管理系統</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --primary: #2563eb;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --family: #8b5cf6;
+      --shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+      background: linear-gradient(180deg, #f8fafc 0%, #eff6ff 100%);
+      color: var(--text);
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, #1d4ed8, #2563eb 45%, #60a5fa);
+      color: #fff;
+      border-radius: 24px;
+      padding: 26px;
+      box-shadow: var(--shadow);
+      margin-bottom: 20px;
+    }
+
+    .hero-top {
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:flex-start;
+      flex-wrap:wrap;
+    }
+
+    .hero h1 {
+      margin: 0 0 8px;
+      font-size: 30px;
+    }
+
+    .hero p {
+      margin: 0;
+      opacity: 0.9;
+      line-height: 1.6;
+    }
+
+    .user-chip {
+      background: rgba(255,255,255,0.18);
+      padding: 10px 14px;
+      border-radius: 999px;
+      font-size: 14px;
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      margin: 18px 0 22px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn, button {
+      border: none;
+      border-radius: 12px;
+      padding: 11px 16px;
+      font-size: 15px;
+      cursor: pointer;
+      transition: 0.2s ease;
+    }
+
+    .tab-btn {
+      background: rgba(255,255,255,0.9);
+      color: var(--text);
+      box-shadow: var(--shadow);
+    }
+
+    .tab-btn.active {
+      background: var(--primary);
+      color: white;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-secondary { background: #111827; color: white; }
+    .btn-light { background: white; color: var(--text); box-shadow: var(--shadow); }
+    .btn-danger { background: var(--danger); color: white; }
+
+    .section { display: none; }
+    .section.active { display: block; }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px;
+    }
+
+    .stat-card h3 {
+      margin: 0 0 8px;
+      font-size: 15px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .stat-card .value {
+      font-size: 34px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+
+    .stat-card .desc {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 18px;
+    }
+
+    .parking-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(110px, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .spot {
+      border-radius: 16px;
+      padding: 14px;
+      border: 2px solid transparent;
+      min-height: 118px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: 0.2s ease;
+    }
+
+    .spot:hover { transform: translateY(-2px); }
+    .spot.empty { background: #ecfdf5; border-color: #a7f3d0; }
+    .spot.rented { background: #eff6ff; border-color: #93c5fd; }
+    .spot.expiring { background: #fffbeb; border-color: #fcd34d; }
+    .spot.family { background: #f5f3ff; border-color: #c4b5fd; }
+
+    .spot-number { font-size: 20px; font-weight: 800; }
+    .spot-status { font-size: 13px; color: var(--muted); }
+    .spot-tenant {
+      font-size: 13px;
+      line-height: 1.45;
+      color: #374151;
+      word-break: break-word;
+    }
+
+    .legend {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #f8fafc;
+      border-radius: 999px;
+      padding: 8px 12px;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      display: inline-block;
+    }
+
+    .dot.empty { background: #10b981; }
+    .dot.rented { background: #2563eb; }
+    .dot.expiring { background: #f59e0b; }
+    .dot.family { background: #8b5cf6; }
+
+    .list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 14px;
+      max-height: 560px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .tenant-item, .payment-item {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      background: #fff;
+    }
+
+    .tenant-head, .payment-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: start;
+      margin-bottom: 8px;
+    }
+
+    .tenant-name, .payment-title { font-size: 17px; font-weight: 800; }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .badge.family { background: #ede9fe; color: #6d28d9; }
+    .badge.rented { background: #dbeafe; color: #1d4ed8; }
+    .badge.expiring { background: #fef3c7; color: #b45309; }
+    .badge.empty { background: #dcfce7; color: #047857; }
+
+    .meta {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .inline-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .inline-actions button {
+      padding: 8px 12px;
+      font-size: 13px;
+    }
+
+    .filter-row, .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      font-size: 14px;
+      color: #374151;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 11px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 12px;
+      font-size: 15px;
+      font-family: inherit;
+      background: white;
+    }
+
+    textarea { min-height: 90px; resize: vertical; }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .table-wrap { overflow: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 14px;
+      background: white;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 12px 10px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+
+    th {
+      background: #f8fafc;
+      color: #475569;
+      font-weight: 700;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 50;
+    }
+
+    .modal.active { display: flex; }
+
+    .modal-card {
+      width: min(720px, 100%);
+      max-height: 90vh;
+      overflow: auto;
+      background: white;
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+
+    .modal-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .modal-head h3 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    .close-btn {
+      background: #eef2ff;
+      color: #3730a3;
+    }
+
+    .hidden { display: none !important; }
+
+    .footer-note {
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .toast-wrap {
+      position: fixed;
+      right: 18px;
+      bottom: 18px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      z-index: 100;
+    }
+
+    .toast {
+      background:#0f172a;
+      color:white;
+      padding:12px 14px;
+      border-radius:14px;
+      box-shadow: var(--shadow);
+      max-width: 340px;
+      font-size: 14px;
+    }
+
+    .login-screen {
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+    }
+
+    .login-card {
+      width:min(460px, 100%);
+      background: white;
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      padding: 24px;
+    }
+
+    .login-card h1 {
+      margin:0 0 8px;
+      font-size: 30px;
+    }
+
+    .login-card p {
+      margin:0 0 18px;
+      color: var(--muted);
+      line-height:1.7;
+    }
+
+    .small-grid {
+      display:grid;
+      gap:12px;
+    }
+
+    .helper-box {
+      margin-top:14px;
+      padding:12px 14px;
+      border-radius: 14px;
+      background:#eff6ff;
+      color:#1d4ed8;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .sync-badge {
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.18);
+      font-size: 13px;
+    }
+
+    .status-saving { color: #fef3c7; }
+    .status-saved { color: #dcfce7; }
+    .status-error { color: #fecaca; }
+
+    @media (max-width: 1100px) {
+      .layout, .split { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 780px) {
+      .container { padding: 16px; }
+      .hero h1 { font-size: 24px; }
+      .parking-grid { grid-template-columns: repeat(3, minmax(92px, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <div id="loginScreen" class="login-screen">
+    <div class="login-card">
+      <h1>何家停車場登入</h1>
+      <p>這版是單一共用帳號。輸入你設定的帳號密碼後，就直接進管理畫面，不走 email 註冊那套迷宮。</p>
+      <div class="small-grid">
+        <label>帳號
+          <input type="text" id="usernameInput" placeholder="例如：admin" autocomplete="username" />
+        </label>
+        <label>密碼
+          <input type="password" id="passwordInput" placeholder="請輸入密碼" autocomplete="current-password" />
+        </label>
+      </div>
+      <div class="inline-actions" style="margin-top:16px;">
+        <button id="loginBtn" class="btn-primary">登入</button>
+      </div>
+      <div class="helper-box">
+        第一次部署時，你需要先在 Netlify 設定：
+        <strong>APP_USERNAME</strong> 與 <strong>APP_PASSWORD</strong>。<br>
+        這樣全家就共用同一組帳密，不需要各自註冊。
+      </div>
+    </div>
+  </div>
+
+  <div id="appShell" class="hidden">
+    <div class="container">
+      <div class="hero">
+        <div class="hero-top">
+          <div>
+            <h1>月租停車場管理系統</h1>
+            <p>專為何家停車場設計。僅管理汽車月租，共 30 個車位，支援家人自用車位、到期提醒、收費紀錄與雲端同步。</p>
+          </div>
+          <div class="user-chip">
+            <span>已登入：<strong id="currentUsername">admin</strong></span>
+            <span class="sync-badge" id="syncStatus">尚未同步</span>
+            <button id="logoutBtn" class="btn-light" style="padding:8px 12px;">登出</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="overview">車位總覽</button>
+          <button class="tab-btn" data-tab="tenants">租戶管理</button>
+          <button class="tab-btn" data-tab="payments">收費紀錄</button>
+          <button class="tab-btn" data-tab="settings">設定 / 備份</button>
+        </div>
+        <div class="actions">
+          <button class="btn-light" id="addTenantTopBtn">＋ 新增租戶</button>
+          <button class="btn-secondary" id="addPaymentTopBtn">＋ 新增收費</button>
+        </div>
+      </div>
+
+      <section class="section active" id="overviewSection">
+        <div class="stats" id="stats"></div>
+        <div class="layout">
+          <div class="card">
+            <h2>車位配置</h2>
+            <div class="muted">共 30 格，點任何車位都能看詳細資料。黃色代表即將到期，紫色代表家人自用。</div>
+            <div class="legend">
+              <span class="pill"><span class="dot empty"></span>空車位</span>
+              <span class="pill"><span class="dot rented"></span>已租出</span>
+              <span class="pill"><span class="dot expiring"></span>即將到期</span>
+              <span class="pill"><span class="dot family"></span>家人自用</span>
+            </div>
+            <div class="parking-grid" id="parkingGrid"></div>
+          </div>
+          <div class="card">
+            <h2>近期提醒</h2>
+            <div class="muted">這裡會抓出即將到期的租戶，方便你先聯絡，不用等到最後一天才手忙腳亂。</div>
+            <div class="list" id="alertsList"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="tenantsSection">
+        <div class="card">
+          <h2>租戶管理</h2>
+          <div class="filter-row">
+            <label>搜尋
+              <input type="text" id="tenantSearch" placeholder="姓名 / 車牌 / 電話 / 車位" />
+            </label>
+            <label>篩選狀態
+              <select id="tenantFilter">
+                <option value="all">全部</option>
+                <option value="rented">一般月租</option>
+                <option value="family">家人自用</option>
+                <option value="expiring">即將到期</option>
+              </select>
+            </label>
+            <label>到期提醒天數
+              <input type="number" id="reminderDaysInput" min="1" max="120" />
+            </label>
+          </div>
+          <div class="list" id="tenantList"></div>
+        </div>
+      </section>
+
+      <section class="section" id="paymentsSection">
+        <div class="split">
+          <div class="card">
+            <h2>收費紀錄</h2>
+            <div class="muted">你可以手動登記每一筆月租收款。家人自用若不收費，也可以不建立紀錄。</div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>收費月份</th>
+                    <th>租戶</th>
+                    <th>車位</th>
+                    <th>金額</th>
+                    <th>收款日</th>
+                    <th>方式</th>
+                    <th>備註</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="paymentTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card">
+            <h2>收費摘要</h2>
+            <div class="stats" id="paymentStats"></div>
+            <div class="footer-note">這版會優先把資料同步到雲端。你也可以照樣匯出 JSON，當成額外保險箱。</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="settingsSection">
+        <div class="split">
+          <div class="card">
+            <h2>基本設定</h2>
+            <div class="form-grid">
+              <label>停車場名稱
+                <input type="text" id="lotNameInput" placeholder="例如：何家月租停車場" />
+              </label>
+              <label>總車位數
+                <input type="number" value="30" disabled />
+              </label>
+              <label>到期提醒天數
+                <input type="number" id="settingsReminderDays" min="1" max="120" />
+              </label>
+              <label>家人自用預設租金
+                <input type="number" id="familyRentDefault" min="0" step="100" />
+              </label>
+            </div>
+            <div class="inline-actions">
+              <button class="btn-primary" id="saveSettingsBtn">儲存設定</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h2>備份與資料處理</h2>
+            <div class="muted">匯出 JSON 可以完整保留租戶、車位、收費紀錄。匯入時會直接覆蓋目前資料，所以按之前先看一眼，別讓資料上演消失的車牌。</div>
+            <div class="inline-actions">
+              <button class="btn-light" id="exportBtn">匯出備份 JSON</button>
+              <label class="btn-light" style="display:inline-flex;align-items:center;justify-content:center;cursor:pointer;">
+                匯入備份 JSON
+                <input type="file" id="importFile" accept="application/json" class="hidden" />
+              </label>
+              <button class="btn-danger" id="resetDemoBtn">重置成示範資料</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal" id="tenantModal">
+      <div class="modal-card">
+        <div class="modal-head">
+          <h3 id="tenantModalTitle">新增租戶</h3>
+          <button class="close-btn" id="closeTenantModal">關閉</button>
+        </div>
+        <form id="tenantForm">
+          <input type="hidden" id="tenantId" />
+          <div class="form-grid">
+            <label>姓名 *
+              <input type="text" id="name" required />
+            </label>
+            <label>電話 *
+              <input type="text" id="phone" required />
+            </label>
+            <label>車牌號碼 *
+              <input type="text" id="plate" required />
+            </label>
+            <label>車位號碼 *
+              <select id="spotNumber" required></select>
+            </label>
+            <label>月租金（元） *
+              <input type="number" id="monthlyRent" min="0" step="100" required />
+            </label>
+            <label>合約開始日 *
+              <input type="date" id="contractStart" required />
+            </label>
+            <label>合約到期日（選填）
+              <input type="date" id="contractEnd" />
+            </label>
+            <label>租戶類型
+              <select id="tenantType">
+                <option value="rented">一般月租</option>
+                <option value="family">家人自用</option>
+              </select>
+            </label>
+          </div>
+          <label style="margin-top:12px;">備註
+            <textarea id="note" placeholder="例如：家人自用、不收費、固定每月5日匯款... "></textarea>
+          </label>
+          <div class="footer-note">合約到期日現在是選填。家人自用車位可以不填，一般月租若你也想暫時不填，系統也會接受。</div>
+          <div class="inline-actions" style="margin-top:14px;">
+            <button type="submit" class="btn-primary">儲存</button>
+            <button type="button" class="btn-light" id="cancelTenantBtn">取消</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal" id="paymentModal">
+      <div class="modal-card">
+        <div class="modal-head">
+          <h3 id="paymentModalTitle">新增收費紀錄</h3>
+          <button class="close-btn" id="closePaymentModal">關閉</button>
+        </div>
+        <form id="paymentForm">
+          <input type="hidden" id="paymentId" />
+          <div class="form-grid">
+            <label>租戶 / 車位 *
+              <select id="paymentTenant" required></select>
+            </label>
+            <label>收費月份 *
+              <input type="month" id="paymentMonth" required />
+            </label>
+            <label>金額 *
+              <input type="number" id="paymentAmount" min="0" step="100" required />
+            </label>
+            <label>收款日 *
+              <input type="date" id="paymentDate" required />
+            </label>
+            <label>收款方式
+              <select id="paymentMethod">
+                <option value="現金">現金</option>
+                <option value="轉帳">轉帳</option>
+                <option value="匯款">匯款</option>
+                <option value="其他">其他</option>
+              </select>
+            </label>
+          </div>
+          <label style="margin-top:12px;">備註
+            <textarea id="paymentNote" placeholder="例如：4月月租已收、媽媽的車位不收費... "></textarea>
+          </label>
+          <div class="inline-actions" style="margin-top:14px;">
+            <button type="submit" class="btn-primary">儲存</button>
+            <button type="button" class="btn-light" id="cancelPaymentBtn">取消</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-wrap" id="toastWrap"></div>
+
+  <script>
+    const TOTAL_SPOTS = 30;
+    const today = new Date();
+    const todayStr = toDateInputValue(today);
+    const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+
+    let state = defaultState();
+    let currentUser = null;
+    let saveTimer = null;
+    let loading = false;
+
+    function defaultState() {
+      return {
+        settings: {
+          lotName: '何家月租停車場',
+          reminderDays: 30,
+          familyRentDefault: 0,
+        },
+        tenants: demoTenants(),
+        payments: demoPayments(),
+      };
+    }
+
+    function demoTenants() {
+      return [
+        {
+          id: crypto.randomUUID(),
+          name: '王先生',
+          phone: '0912-345-678',
+          plate: 'ABC-1234',
+          spotNumber: 3,
+          monthlyRent: 3500,
+          contractStart: '2026-01-01',
+          contractEnd: '2026-04-28',
+          tenantType: 'rented',
+          note: '每月匯款',
+        },
+        {
+          id: crypto.randomUUID(),
+          name: '陳小姐',
+          phone: '0922-111-222',
+          plate: 'BBB-8888',
+          spotNumber: 8,
+          monthlyRent: 3600,
+          contractStart: '2025-12-01',
+          contractEnd: '2026-12-01',
+          tenantType: 'rented',
+          note: '',
+        },
+        {
+          id: crypto.randomUUID(),
+          name: '媽媽',
+          phone: '家人',
+          plate: 'FAMILY-1',
+          spotNumber: 15,
+          monthlyRent: 0,
+          contractStart: '2025-01-01',
+          contractEnd: '',
+          tenantType: 'family',
+          note: '家人自用',
+        },
+        {
+          id: crypto.randomUUID(),
+          name: '弟弟',
+          phone: '家人',
+          plate: 'FAMILY-2',
+          spotNumber: 22,
+          monthlyRent: 0,
+          contractStart: '2025-01-01',
+          contractEnd: '',
+          tenantType: 'family',
+          note: '家人自用',
+        },
+      ];
+    }
+
+    function demoPayments() {
+      return [
+        {
+          id: crypto.randomUUID(),
+          tenantId: '',
+          paymentMonth: '2026-04',
+          amount: 3500,
+          paymentDate: todayStr,
+          paymentMethod: '匯款',
+          note: '示範資料',
+        },
+      ];
+    }
+
+    function toDateInputValue(date) {
+      const d = new Date(date);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function formatDate(dateStr) {
+      if (!dateStr) return '未填寫';
+      const d = new Date(dateStr + 'T00:00:00');
+      if (Number.isNaN(d.getTime())) return dateStr;
+      return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
+    }
+
+    function formatCurrency(num) {
+      return new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 }).format(Number(num || 0));
+    }
+
+    function daysUntil(dateStr) {
+      if (!dateStr) return null;
+      const todayStart = new Date();
+      todayStart.setHours(0,0,0,0);
+      const target = new Date(dateStr + 'T00:00:00');
+      return Math.ceil((target - todayStart) / (1000 * 60 * 60 * 24));
+    }
+
+    function getTenantStatus(tenant) {
+      if (tenant.tenantType === 'family') return 'family';
+      const remaining = daysUntil(tenant.contractEnd);
+      if (tenant.contractEnd && remaining !== null && remaining <= state.settings.reminderDays) {
+        return 'expiring';
+      }
+      return 'rented';
+    }
+
+    function getSpotTenant(spotNumber) {
+      return state.tenants.find(t => Number(t.spotNumber) === Number(spotNumber)) || null;
+    }
+
+    function renderAll() {
+      document.title = `${state.settings.lotName} | 月租停車場管理系統`;
+      renderStats();
+      renderGrid();
+      renderAlerts();
+      renderTenantList();
+      renderPaymentTable();
+      renderPaymentStats();
+      syncSettingsUI();
+      fillSpotOptions();
+      fillPaymentTenantOptions();
+    }
+
+    function renderStats() {
+      const occupied = state.tenants.length;
+      const familyCount = state.tenants.filter(t => t.tenantType === 'family').length;
+      const expiring = state.tenants.filter(t => getTenantStatus(t) === 'expiring').length;
+      const empty = TOTAL_SPOTS - occupied;
+      const monthlyRevenue = state.tenants
+        .filter(t => t.tenantType !== 'family')
+        .reduce((sum, t) => sum + Number(t.monthlyRent || 0), 0);
+
+      document.getElementById('stats').innerHTML = `
+        <div class="card stat-card"><h3>空車位</h3><div class="value">${empty}</div><div class="desc">尚可出租的車位數</div></div>
+        <div class="card stat-card"><h3>已租出</h3><div class="value">${occupied - familyCount}</div><div class="desc">一般月租車位</div></div>
+        <div class="card stat-card"><h3>即將到期</h3><div class="value">${expiring}</div><div class="desc">${state.settings.reminderDays} 天內到期</div></div>
+        <div class="card stat-card"><h3>家人自用</h3><div class="value">${familyCount}</div><div class="desc">留給家人的固定車位</div></div>
+        <div class="card stat-card"><h3>預估月收</h3><div class="value" style="font-size:28px;">${formatCurrency(monthlyRevenue)}</div><div class="desc">以目前一般月租資料推估</div></div>
+      `;
+    }
+
+    function renderGrid() {
+      const grid = document.getElementById('parkingGrid');
+      grid.innerHTML = '';
+      for (let i = 1; i <= TOTAL_SPOTS; i++) {
+        const tenant = getSpotTenant(i);
+        const status = tenant ? getTenantStatus(tenant) : 'empty';
+        const div = document.createElement('div');
+        div.className = `spot ${status}`;
+        div.innerHTML = `
+          <div>
+            <div class="spot-number">${i}</div>
+            <div class="spot-status">${statusText(status)}</div>
+          </div>
+          <div class="spot-tenant">${tenant ? `${escapeHtml(tenant.name)}<br>${escapeHtml(tenant.plate)}` : '目前空位'}</div>
+        `;
+        div.addEventListener('click', () => {
+          if (tenant) openTenantModal(tenant.id);
+          else openTenantModal(null, i);
+        });
+        grid.appendChild(div);
+      }
+    }
+
+    function renderAlerts() {
+      const container = document.getElementById('alertsList');
+      const alerts = state.tenants
+        .filter(t => getTenantStatus(t) === 'expiring')
+        .sort((a, b) => daysUntil(a.contractEnd) - daysUntil(b.contractEnd));
+
+      if (!alerts.length) {
+        container.innerHTML = `<div class="tenant-item"><div class="tenant-name">目前沒有即將到期的租戶</div><div class="meta">乾乾淨淨，今天不用追著合約跑。</div></div>`;
+        return;
+      }
+
+      container.innerHTML = alerts.map(t => {
+        const days = daysUntil(t.contractEnd);
+        return `
+          <div class="tenant-item">
+            <div class="tenant-head">
+              <div>
+                <div class="tenant-name">${escapeHtml(t.name)}</div>
+                <div class="meta">車位 ${t.spotNumber} ・ ${escapeHtml(t.plate)}</div>
+              </div>
+              <span class="badge expiring">${days < 0 ? '已逾期' : `剩 ${days} 天`}</span>
+            </div>
+            <div class="meta">到期日：${formatDate(t.contractEnd)}<br>電話：${escapeHtml(t.phone)}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderTenantList() {
+      const keyword = document.getElementById('tenantSearch').value.trim().toLowerCase();
+      const filter = document.getElementById('tenantFilter').value;
+      const list = document.getElementById('tenantList');
+
+      let tenants = [...state.tenants].sort((a,b) => Number(a.spotNumber) - Number(b.spotNumber));
+      if (keyword) {
+        tenants = tenants.filter(t => [t.name, t.phone, t.plate, String(t.spotNumber)].join(' ').toLowerCase().includes(keyword));
+      }
+      if (filter !== 'all') {
+        tenants = tenants.filter(t => getTenantStatus(t) === filter);
+      }
+
+      if (!tenants.length) {
+        list.innerHTML = `<div class="tenant-item"><div class="tenant-name">查無符合資料</div><div class="meta">換個關鍵字試試，或直接新增一筆。</div></div>`;
+        return;
+      }
+
+      list.innerHTML = tenants.map(t => {
+        const status = getTenantStatus(t);
+        const days = t.contractEnd ? daysUntil(t.contractEnd) : null;
+        return `
+          <div class="tenant-item">
+            <div class="tenant-head">
+              <div>
+                <div class="tenant-name">${escapeHtml(t.name)}</div>
+                <div class="meta">車位 ${t.spotNumber} ・ ${escapeHtml(t.plate)} ・ ${escapeHtml(t.phone)}</div>
+              </div>
+              <span class="badge ${status}">${statusText(status)}</span>
+            </div>
+            <div class="meta">
+              月租金：${formatCurrency(t.monthlyRent)}<br>
+              合約：${formatDate(t.contractStart)} ～ ${formatDate(t.contractEnd)}
+              ${days !== null ? `<br>距離到期：${days} 天` : '<br>距離到期：未設定'}
+              ${t.note ? `<br>備註：${escapeHtml(t.note)}` : ''}
+            </div>
+            <div class="inline-actions">
+              <button class="btn-light" onclick="openTenantModal('${t.id}')">編輯</button>
+              <button class="btn-light" onclick="openPaymentModal(null, '${t.id}')">登記收費</button>
+              <button class="btn-danger" onclick="deleteTenant('${t.id}')">刪除</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderPaymentTable() {
+      const tbody = document.getElementById('paymentTableBody');
+      const rows = [...state.payments].sort((a,b) => {
+        const d1 = `${a.paymentDate || ''} ${a.paymentMonth || ''}`;
+        const d2 = `${b.paymentDate || ''} ${b.paymentMonth || ''}`;
+        return d1 < d2 ? 1 : -1;
+      });
+
+      if (!rows.length) {
+        tbody.innerHTML = `<tr><td colspan="8">目前沒有收費紀錄</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = rows.map(p => {
+        const tenant = state.tenants.find(t => t.id === p.tenantId);
+        return `
+          <tr>
+            <td>${escapeHtml(p.paymentMonth)}</td>
+            <td>${tenant ? escapeHtml(tenant.name) : '已刪除租戶'}</td>
+            <td>${tenant ? tenant.spotNumber : '-'}</td>
+            <td>${formatCurrency(p.amount)}</td>
+            <td>${formatDate(p.paymentDate)}</td>
+            <td>${escapeHtml(p.paymentMethod || '')}</td>
+            <td>${escapeHtml(p.note || '')}</td>
+            <td>
+              <div class="inline-actions">
+                <button class="btn-light" onclick="openPaymentModal('${p.id}')">編輯</button>
+                <button class="btn-danger" onclick="deletePayment('${p.id}')">刪除</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderPaymentStats() {
+      const thisMonthTotal = state.payments
+        .filter(p => p.paymentMonth === currentMonthStr)
+        .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const overallTotal = state.payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const paymentCount = state.payments.length;
+      document.getElementById('paymentStats').innerHTML = `
+        <div class="card stat-card"><h3>本月已收</h3><div class="value" style="font-size:28px;">${formatCurrency(thisMonthTotal)}</div><div class="desc">${currentMonthStr} 的紀錄總額</div></div>
+        <div class="card stat-card"><h3>累計收款</h3><div class="value" style="font-size:28px;">${formatCurrency(overallTotal)}</div><div class="desc">所有歷史收費合計</div></div>
+        <div class="card stat-card"><h3>收費筆數</h3><div class="value">${paymentCount}</div><div class="desc">目前已建立的紀錄數</div></div>
+      `;
+    }
+
+    function syncSettingsUI() {
+      document.getElementById('lotNameInput').value = state.settings.lotName;
+      document.getElementById('reminderDaysInput').value = state.settings.reminderDays;
+      document.getElementById('settingsReminderDays').value = state.settings.reminderDays;
+      document.getElementById('familyRentDefault').value = state.settings.familyRentDefault;
+    }
+
+    function fillSpotOptions(selected = '') {
+      const select = document.getElementById('spotNumber');
+      select.innerHTML = '';
+      for (let i = 1; i <= TOTAL_SPOTS; i++) {
+        const occupiedBy = getSpotTenant(i);
+        const option = document.createElement('option');
+        option.value = i;
+        option.textContent = occupiedBy ? `${i} 號（已被 ${occupiedBy.name} 使用）` : `${i} 號`;
+        option.disabled = Boolean(occupiedBy && String(occupiedBy.id) !== String(document.getElementById('tenantId').value || ''));
+        if (String(i) === String(selected)) option.selected = true;
+        select.appendChild(option);
+      }
+    }
+
+    function fillPaymentTenantOptions(selected = '') {
+      const select = document.getElementById('paymentTenant');
+      select.innerHTML = '<option value="">請選擇租戶</option>';
+      state.tenants
+        .sort((a,b) => Number(a.spotNumber) - Number(b.spotNumber))
+        .forEach(t => {
+          const option = document.createElement('option');
+          option.value = t.id;
+          option.textContent = `${t.spotNumber} 號｜${t.name}｜${t.plate}`;
+          if (selected === t.id) option.selected = true;
+          select.appendChild(option);
+        });
+    }
+
+    function statusText(status) {
+      return ({ empty: '空車位', rented: '已租出', expiring: '即將到期', family: '家人自用' })[status] || status;
+    }
+
+    function openTenantModal(id = null, presetSpot = null) {
+      const modal = document.getElementById('tenantModal');
+      const title = document.getElementById('tenantModalTitle');
+      const form = document.getElementById('tenantForm');
+      form.reset();
+      document.getElementById('tenantId').value = '';
+      document.getElementById('contractEnd').value = '';
+      document.getElementById('tenantType').value = 'rented';
+      document.getElementById('monthlyRent').value = 0;
+      document.getElementById('contractStart').value = todayStr;
+      document.getElementById('note').value = '';
+
+      if (id) {
+        const tenant = state.tenants.find(t => t.id === id);
+        if (!tenant) return;
+        title.textContent = `編輯租戶｜${tenant.name}`;
+        document.getElementById('tenantId').value = tenant.id;
+        document.getElementById('name').value = tenant.name;
+        document.getElementById('phone').value = tenant.phone;
+        document.getElementById('plate').value = tenant.plate;
+        document.getElementById('monthlyRent').value = tenant.monthlyRent;
+        document.getElementById('contractStart').value = tenant.contractStart || todayStr;
+        document.getElementById('contractEnd').value = tenant.contractEnd || '';
+        document.getElementById('tenantType').value = tenant.tenantType || 'rented';
+        document.getElementById('note').value = tenant.note || '';
+        fillSpotOptions(tenant.spotNumber);
+      } else {
+        title.textContent = '新增租戶';
+        fillSpotOptions(presetSpot || '');
+      }
+      modal.classList.add('active');
+    }
+
+    function closeTenantModal() {
+      document.getElementById('tenantModal').classList.remove('active');
+    }
+
+    function openPaymentModal(id = null, presetTenantId = '') {
+      const modal = document.getElementById('paymentModal');
+      const title = document.getElementById('paymentModalTitle');
+      document.getElementById('paymentForm').reset();
+      document.getElementById('paymentId').value = '';
+      document.getElementById('paymentMonth').value = currentMonthStr;
+      document.getElementById('paymentDate').value = todayStr;
+      document.getElementById('paymentMethod').value = '現金';
+      document.getElementById('paymentNote').value = '';
+      fillPaymentTenantOptions(presetTenantId);
+
+      if (id) {
+        const p = state.payments.find(x => x.id === id);
+        if (!p) return;
+        title.textContent = '編輯收費紀錄';
+        document.getElementById('paymentId').value = p.id;
+        fillPaymentTenantOptions(p.tenantId);
+        document.getElementById('paymentMonth').value = p.paymentMonth;
+        document.getElementById('paymentAmount').value = p.amount;
+        document.getElementById('paymentDate').value = p.paymentDate;
+        document.getElementById('paymentMethod').value = p.paymentMethod || '現金';
+        document.getElementById('paymentNote').value = p.note || '';
+      } else {
+        title.textContent = '新增收費紀錄';
+        if (presetTenantId) {
+          const tenant = state.tenants.find(t => t.id === presetTenantId);
+          document.getElementById('paymentAmount').value = tenant ? tenant.monthlyRent : '';
+        }
+      }
+      modal.classList.add('active');
+    }
+
+    function closePaymentModal() {
+      document.getElementById('paymentModal').classList.remove('active');
+    }
+
+    function deleteTenant(id) {
+      const tenant = state.tenants.find(t => t.id === id);
+      if (!tenant) return;
+      if (!confirm(`確定要刪除 ${tenant.name}（車位 ${tenant.spotNumber}）嗎？`)) return;
+      state.tenants = state.tenants.filter(t => t.id !== id);
+      state.payments = state.payments.filter(p => p.tenantId !== id);
+      renderAll();
+      scheduleSave();
+    }
+
+    function deletePayment(id) {
+      const payment = state.payments.find(p => p.id === id);
+      if (!payment) return;
+      if (!confirm('確定要刪除這筆收費紀錄嗎？')) return;
+      state.payments = state.payments.filter(p => p.id !== id);
+      renderAll();
+      scheduleSave();
+    }
+
+    function exportBackup() {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${state.settings.lotName.replace(/\s+/g, '_')}_backup.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    function showToast(message) {
+      const wrap = document.getElementById('toastWrap');
+      const item = document.createElement('div');
+      item.className = 'toast';
+      item.textContent = message;
+      wrap.appendChild(item);
+      setTimeout(() => {
+        item.remove();
+      }, 3200);
+    }
+
+    function setSyncStatus(text, cls = '') {
+      const el = document.getElementById('syncStatus');
+      if (!el) return;
+      el.textContent = text;
+      el.className = `sync-badge ${cls}`.trim();
+    }
+
+    async function api(path, options = {}) {
+      const res = await fetch(`/.netlify/functions/${path}`, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(options.headers || {}),
+        },
+        ...options,
+      });
+      const contentType = res.headers.get('content-type') || '';
+      const data = contentType.includes('application/json') ? await res.json() : await res.text();
+      if (!res.ok) {
+        throw new Error(data?.error || data || '請求失敗');
+      }
+      return data;
+    }
+
+    async function login() {
+      const username = document.getElementById('usernameInput').value.trim();
+      const password = document.getElementById('passwordInput').value;
+      if (!username || !password) {
+        showToast('請先輸入帳號和密碼');
+        return;
+      }
+      try {
+        const data = await api('login', {
+          method: 'POST',
+          body: JSON.stringify({ username, password }),
+        });
+        currentUser = data.username;
+        document.getElementById('currentUsername').textContent = currentUser;
+        document.getElementById('loginScreen').classList.add('hidden');
+        document.getElementById('appShell').classList.remove('hidden');
+        setSyncStatus('讀取雲端資料中...');
+        await loadRemoteState();
+        showToast('登入成功');
+      } catch (err) {
+        showToast(`登入失敗：${err.message}`);
+      }
+    }
+
+    async function checkSession() {
+      try {
+        const data = await api('session', { method: 'GET' });
+        if (data.authenticated) {
+          currentUser = data.username;
+          document.getElementById('currentUsername').textContent = currentUser;
+          document.getElementById('loginScreen').classList.add('hidden');
+          document.getElementById('appShell').classList.remove('hidden');
+          setSyncStatus('讀取雲端資料中...');
+          await loadRemoteState();
+        }
+      } catch (_) {
+        // ignore
+      }
+    }
+
+    async function logout() {
+      try {
+        await api('logout', { method: 'POST' });
+      } catch (_) {}
+      currentUser = null;
+      document.getElementById('appShell').classList.add('hidden');
+      document.getElementById('loginScreen').classList.remove('hidden');
+      document.getElementById('passwordInput').value = '';
+      setSyncStatus('尚未同步');
+      showToast('已登出');
+    }
+
+    async function loadRemoteState() {
+      loading = true;
+      try {
+        const data = await api('state', { method: 'GET' });
+        if (data && data.state) {
+          state = normalizeState(data.state);
+        } else {
+          state = normalizeState(defaultState());
+          await saveRemoteState();
+        }
+        hydrateDemoPaymentTenant();
+        renderAll();
+        setSyncStatus('雲端已同步', 'status-saved');
+      } catch (err) {
+        setSyncStatus('雲端讀取失敗', 'status-error');
+        showToast(`讀取資料失敗：${err.message}`);
+      } finally {
+        loading = false;
+      }
+    }
+
+    function normalizeState(raw) {
+      const base = defaultState();
+      return {
+        settings: { ...base.settings, ...(raw.settings || {}) },
+        tenants: Array.isArray(raw.tenants) ? raw.tenants : [],
+        payments: Array.isArray(raw.payments) ? raw.payments : [],
+      };
+    }
+
+    async function saveRemoteState() {
+      try {
+        setSyncStatus('同步中...', 'status-saving');
+        await api('state', {
+          method: 'POST',
+          body: JSON.stringify({ state }),
+        });
+        setSyncStatus('雲端已同步', 'status-saved');
+      } catch (err) {
+        setSyncStatus('同步失敗', 'status-error');
+        showToast(`同步失敗：${err.message}`);
+      }
+    }
+
+    function scheduleSave() {
+      if (loading) return;
+      clearTimeout(saveTimer);
+      setSyncStatus('等待同步...', 'status-saving');
+      saveTimer = setTimeout(() => {
+        saveRemoteState();
+      }, 500);
+    }
+
+    function hydrateDemoPaymentTenant() {
+      state.payments = state.payments.map(p => {
+        if (!p.tenantId && state.tenants.length) {
+          const firstRenter = state.tenants.find(t => t.name === '王先生') || state.tenants[0];
+          return { ...p, tenantId: firstRenter.id };
+        }
+        return p;
+      });
+    }
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active'));
+        btn.classList.add('active');
+        const tab = btn.dataset.tab;
+        document.getElementById(tab + 'Section').classList.add('active');
+      });
+    });
+
+    document.getElementById('tenantForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const id = document.getElementById('tenantId').value;
+      const tenant = {
+        id: id || crypto.randomUUID(),
+        name: document.getElementById('name').value.trim(),
+        phone: document.getElementById('phone').value.trim(),
+        plate: document.getElementById('plate').value.trim().toUpperCase(),
+        spotNumber: Number(document.getElementById('spotNumber').value),
+        monthlyRent: Number(document.getElementById('monthlyRent').value || 0),
+        contractStart: document.getElementById('contractStart').value,
+        contractEnd: document.getElementById('contractEnd').value,
+        tenantType: document.getElementById('tenantType').value,
+        note: document.getElementById('note').value.trim(),
+      };
+
+      const spotTaken = state.tenants.find(t => Number(t.spotNumber) === tenant.spotNumber && t.id !== tenant.id);
+      if (spotTaken) {
+        alert(`車位 ${tenant.spotNumber} 已被 ${spotTaken.name} 使用。`);
+        return;
+      }
+
+      const plateTaken = state.tenants.find(t => t.plate.toUpperCase() === tenant.plate.toUpperCase() && t.id !== tenant.id);
+      if (plateTaken) {
+        alert(`車牌 ${tenant.plate} 已存在。`);
+        return;
+      }
+
+      if (tenant.tenantType === 'family' && !document.getElementById('monthlyRent').value) {
+        tenant.monthlyRent = Number(state.settings.familyRentDefault || 0);
+      }
+
+      if (id) {
+        state.tenants = state.tenants.map(t => t.id === id ? tenant : t);
+      } else {
+        state.tenants.push(tenant);
+      }
+      closeTenantModal();
+      renderAll();
+      scheduleSave();
+    });
+
+    document.getElementById('paymentForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const id = document.getElementById('paymentId').value;
+      const record = {
+        id: id || crypto.randomUUID(),
+        tenantId: document.getElementById('paymentTenant').value,
+        paymentMonth: document.getElementById('paymentMonth').value,
+        amount: Number(document.getElementById('paymentAmount').value || 0),
+        paymentDate: document.getElementById('paymentDate').value,
+        paymentMethod: document.getElementById('paymentMethod').value,
+        note: document.getElementById('paymentNote').value.trim(),
+      };
+      if (!record.tenantId) {
+        alert('請先選擇租戶。');
+        return;
+      }
+      if (id) {
+        state.payments = state.payments.map(p => p.id === id ? record : p);
+      } else {
+        state.payments.push(record);
+      }
+      closePaymentModal();
+      renderAll();
+      scheduleSave();
+    });
+
+    document.getElementById('tenantSearch').addEventListener('input', renderTenantList);
+    document.getElementById('tenantFilter').addEventListener('change', renderTenantList);
+    document.getElementById('reminderDaysInput').addEventListener('change', e => {
+      state.settings.reminderDays = Number(e.target.value || 30);
+      document.getElementById('settingsReminderDays').value = state.settings.reminderDays;
+      renderAll();
+      scheduleSave();
+    });
+
+    document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+      state.settings.lotName = document.getElementById('lotNameInput').value.trim() || '何家月租停車場';
+      state.settings.reminderDays = Number(document.getElementById('settingsReminderDays').value || 30);
+      state.settings.familyRentDefault = Number(document.getElementById('familyRentDefault').value || 0);
+      renderAll();
+      scheduleSave();
+      showToast('設定已儲存');
+    });
+
+    document.getElementById('exportBtn').addEventListener('click', exportBackup);
+    document.getElementById('importFile').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        if (!parsed.settings || !Array.isArray(parsed.tenants) || !Array.isArray(parsed.payments)) {
+          throw new Error('格式不符');
+        }
+        state = normalizeState(parsed);
+        renderAll();
+        scheduleSave();
+        alert('匯入成功');
+      } catch (err) {
+        alert('匯入失敗，請確認 JSON 格式是否正確。');
+      } finally {
+        e.target.value = '';
+      }
+    });
+
+    document.getElementById('resetDemoBtn').addEventListener('click', () => {
+      if (!confirm('確定要重置成示範資料嗎？目前資料會被覆蓋。')) return;
+      state = defaultState();
+      hydrateDemoPaymentTenant();
+      renderAll();
+      scheduleSave();
+    });
+
+    document.getElementById('addTenantTopBtn').addEventListener('click', () => openTenantModal());
+    document.getElementById('addPaymentTopBtn').addEventListener('click', () => openPaymentModal());
+    document.getElementById('closeTenantModal').addEventListener('click', closeTenantModal);
+    document.getElementById('cancelTenantBtn').addEventListener('click', closeTenantModal);
+    document.getElementById('closePaymentModal').addEventListener('click', closePaymentModal);
+    document.getElementById('cancelPaymentBtn').addEventListener('click', closePaymentModal);
+    document.getElementById('tenantType').addEventListener('change', (e) => {
+      if (e.target.value === 'family' && !document.getElementById('monthlyRent').value) {
+        document.getElementById('monthlyRent').value = Number(state.settings.familyRentDefault || 0);
+      }
+    });
+
+    document.getElementById('loginBtn').addEventListener('click', login);
+    document.getElementById('passwordInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') login();
+    });
+    document.getElementById('logoutBtn').addEventListener('click', logout);
+
+    window.openTenantModal = openTenantModal;
+    window.openPaymentModal = openPaymentModal;
+    window.deleteTenant = deleteTenant;
+    window.deletePayment = deletePayment;
+
+    checkSession();
+  </script>
+</body>
+</html>
