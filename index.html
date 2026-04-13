@@ -513,7 +513,7 @@
         <div class="hero-top">
           <div>
             <h1>月租停車場管理系統</h1>
-            <p>專為何家停車場設計。僅管理汽車月租，共 30 個車位，支援家人自用車位、到期提醒、收費紀錄與雲端同步。</p>
+            <p>專為何家停車場設計。僅管理汽車月租，共 30 個車位，車位編號依現場規則排為 1~33 並略過 4、14、24，支援家人自用車位、到期提醒、收費紀錄與雲端同步。</p>
           </div>
           <div class="user-chip">
             <span>已登入：<strong id="currentUsername">admin</strong></span>
@@ -541,7 +541,7 @@
         <div class="layout">
           <div class="card">
             <h2>車位配置</h2>
-            <div class="muted">共 30 格，點任何車位都能看詳細資料。黃色代表即將到期，紫色代表家人自用。</div>
+            <div class="muted">共 30 格，編號依現場規則略過 4、14、24。點任何車位都能看詳細資料。黃色代表即將到期，紫色代表家人自用。</div>
             <div class="legend">
               <span class="pill"><span class="dot empty"></span>空車位</span>
               <span class="pill"><span class="dot rented"></span>已租出</span>
@@ -745,7 +745,8 @@
   <div class="toast-wrap" id="toastWrap"></div>
 
   <script>
-    const TOTAL_SPOTS = 30;
+    const SPOT_NUMBERS = [1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23, 25, 26, 27, 28, 29, 30, 31, 32, 33];
+    const TOTAL_SPOTS = SPOT_NUMBERS.length;
     const today = new Date();
     const todayStr = toDateInputValue(today);
     const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
@@ -908,21 +909,21 @@
     function renderGrid() {
       const grid = document.getElementById('parkingGrid');
       grid.innerHTML = '';
-      for (let i = 1; i <= TOTAL_SPOTS; i++) {
-        const tenant = getSpotTenant(i);
+      for (const spotNo of SPOT_NUMBERS) {
+        const tenant = getSpotTenant(spotNo);
         const status = tenant ? getTenantStatus(tenant) : 'empty';
         const div = document.createElement('div');
         div.className = `spot ${status}`;
         div.innerHTML = `
           <div>
-            <div class="spot-number">${i}</div>
+            <div class="spot-number">${spotNo}</div>
             <div class="spot-status">${statusText(status)}</div>
           </div>
           <div class="spot-tenant">${tenant ? `${escapeHtml(tenant.name)}<br>${escapeHtml(tenant.plate)}` : '目前空位'}</div>
         `;
         div.addEventListener('click', () => {
           if (tenant) openTenantModal(tenant.id);
-          else openTenantModal(null, i);
+          else openTenantModal(null, spotNo);
         });
         grid.appendChild(div);
       }
@@ -1060,8 +1061,8 @@
     function fillSpotOptions(selected = '') {
       const select = document.getElementById('spotNumber');
       select.innerHTML = '';
-      for (let i = 1; i <= TOTAL_SPOTS; i++) {
-        const occupiedBy = getSpotTenant(i);
+      for (const spotNo of SPOT_NUMBERS) {
+        const occupiedBy = getSpotTenant(spotNo);
         const option = document.createElement('option');
         option.value = i;
         option.textContent = occupiedBy ? `${i} 號（已被 ${occupiedBy.name} 使用）` : `${i} 號`;
