@@ -34,7 +34,7 @@ exports.handler = async (event) => {
     { ok: true, username },
     {
       ...corsHeaders(),
-      'Set-Cookie': `parking_session=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}`,
+      'Set-Cookie': `parking_session=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${60 * 60 * 24 * 30}`,
     }
   );
 };
