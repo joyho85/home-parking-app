@@ -260,9 +260,36 @@
     }
 
     .badge.family { background: #ede9fe; color: #6d28d9; }
+    .badge.half_year { background: #dbeafe; color: #1d4ed8; }
+    .badge.one_year { background: #dcfce7; color: #047857; }
     .badge.rented { background: #dbeafe; color: #1d4ed8; }
     .badge.expiring { background: #fef3c7; color: #b45309; }
     .badge.empty { background: #dcfce7; color: #047857; }
+    .badge.line-bound { background: #dcfce7; color: #047857; }
+    .badge.line-unbound { background: #fee2e2; color: #b91c1c; }
+
+    .line-box {
+      margin-top: 10px;
+      padding: 12px;
+      border: 1px dashed #cbd5e1;
+      border-radius: 12px;
+      background: #f8fafc;
+    }
+
+    .line-code {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      color: #0f172a;
+      background: #fff;
+      border: 1px solid #dbeafe;
+      border-radius: 10px;
+      padding: 7px 10px;
+      margin: 6px 0;
+      word-break: break-all;
+    }
 
     .meta {
       color: var(--muted);
@@ -487,7 +514,6 @@
   <div id="loginScreen" class="login-screen">
     <div class="login-card">
       <h1>何家停車場登入</h1>
-      <p>這版是單一共用帳號。輸入你設定的帳號密碼後，就直接進管理畫面，不走 email 註冊那套迷宮。</p>
       <div class="small-grid">
         <label>帳號
           <input type="text" id="usernameInput" placeholder="例如：admin" autocomplete="username" />
@@ -499,11 +525,6 @@
       <div class="inline-actions" style="margin-top:16px;">
         <button id="loginBtn" class="btn-primary">登入</button>
       </div>
-      <div class="helper-box">
-        第一次部署時，你需要先在 Netlify 設定：
-        <strong>APP_USERNAME</strong> 與 <strong>APP_PASSWORD</strong>。<br>
-        這樣全家就共用同一組帳密，不需要各自註冊。
-      </div>
     </div>
   </div>
 
@@ -513,7 +534,6 @@
         <div class="hero-top">
           <div>
             <h1>月租停車場管理系統</h1>
-            <p>專為何家停車場設計。僅管理汽車月租，共 30 個車位，車位編號依現場規則排為 1~33 並略過 4、14、24，支援家人自用車位、到期提醒、收費紀錄與雲端同步。</p>
           </div>
           <div class="user-chip">
             <span>已登入：<strong id="currentUsername">admin</strong></span>
@@ -541,7 +561,6 @@
         <div class="layout">
           <div class="card">
             <h2>車位配置</h2>
-            <div class="muted">共 30 格，編號依現場規則略過 4、14、24。點任何車位都能看詳細資料。黃色代表即將到期，紫色代表家人自用。</div>
             <div class="legend">
               <span class="pill"><span class="dot empty"></span>空車位</span>
               <span class="pill"><span class="dot rented"></span>已租出</span>
@@ -552,7 +571,7 @@
           </div>
           <div class="card">
             <h2>近期提醒</h2>
-            <div class="muted">這裡會抓出即將到期的租戶，方便你先聯絡，不用等到最後一天才手忙腳亂。</div>
+            <div class="muted">這裡只顯示 7 天內到期的租戶，讓你提早聯絡一次就好，不會太早也不會太吵。</div>
             <div class="list" id="alertsList"></div>
           </div>
         </div>
@@ -568,13 +587,14 @@
             <label>篩選狀態
               <select id="tenantFilter">
                 <option value="all">全部</option>
-                <option value="rented">一般月租</option>
                 <option value="family">家人自用</option>
-                <option value="expiring">即將到期</option>
+                <option value="half_year">半年租</option>
+                <option value="one_year">一年租</option>
+                <option value="expiring">即將到期（7天內）</option>
               </select>
             </label>
-            <label>到期提醒天數
-              <input type="number" id="reminderDaysInput" min="1" max="120" />
+            <label>提醒視窗（固定 7 天）
+              <input type="number" id="reminderDaysInput" min="7" max="7" value="7" disabled />
             </label>
           </div>
           <div class="list" id="tenantList"></div>
@@ -637,8 +657,8 @@
               <label>總車位數
                 <input type="number" value="30" disabled />
               </label>
-              <label>到期提醒天數
-                <input type="number" id="settingsReminderDays" min="1" max="120" />
+              <label>LINE 提醒設定
+                <input type="text" id="settingsReminderDays" value="到期前 7 天通知一次" disabled />
               </label>
               <label>家人自用預設租金
                 <input type="number" id="familyRentDefault" min="0" step="100" />
@@ -647,6 +667,15 @@
             <div class="inline-actions">
               <button class="btn-primary" id="saveSettingsBtn">儲存設定</button>
             </div>
+          </div>
+
+          <div class="card">
+            <h2>LINE 到期提醒</h2>
+            <div class="muted">目前規則是「租約到期前 7 天，只通知一次」。先幫租戶綁定 LINE，之後可手動執行一次提醒測試。等你確認內容沒問題，再加自動排程。</div>
+            <div class="inline-actions">
+              <button class="btn-light" id="runReminderCheckBtn">手動執行 7 天內提醒</button>
+            </div>
+            <div id="lineReminderSummary" class="footer-note">尚未執行提醒檢查。</div>
           </div>
 
           <div class="card">
@@ -686,7 +715,7 @@
             <label>車位號碼 *
               <select id="spotNumber" required></select>
             </label>
-            <label>月租金（元） *
+            <label>應收租金（元） *
               <input type="number" id="monthlyRent" min="0" step="100" required />
             </label>
             <label>合約開始日 *
@@ -697,15 +726,16 @@
             </label>
             <label>租戶類型
               <select id="tenantType">
-                <option value="rented">一般月租</option>
                 <option value="family">家人自用</option>
+                <option value="half_year">半年租</option>
+                <option value="one_year">一年租</option>
               </select>
             </label>
           </div>
           <label style="margin-top:12px;">備註
             <textarea id="note" placeholder="例如：家人自用、不收費、固定每月5日匯款... "></textarea>
           </label>
-          <div class="footer-note">合約到期日現在是選填。家人自用車位可以不填，一般月租若你也想暫時不填，系統也會接受。</div>
+          <div class="footer-note">合約到期日現在是選填。家人自用車位可以不填；半年租與一年租建議填寫，這樣之後才能做 LINE 到期提醒。</div>
           <div class="inline-actions" style="margin-top:14px;">
             <button type="submit" class="btn-primary">儲存</button>
             <button type="button" class="btn-light" id="cancelTenantBtn">取消</button>
@@ -761,6 +791,7 @@
   <script>
     const SPOT_NUMBERS = [1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 15, 16, 17, 18, 19, 20, 21, 22, 23, 25, 26, 27, 28, 29, 30, 31, 32, 33];
     const TOTAL_SPOTS = SPOT_NUMBERS.length;
+    const ALERT_DAYS = 7;
     const today = new Date();
     const todayStr = toDateInputValue(today);
     const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
@@ -775,7 +806,7 @@
       return {
         settings: {
           lotName: '何家月租停車場',
-          reminderDays: 30,
+          reminderDays: ALERT_DAYS,
           familyRentDefault: 0,
         },
         tenants: demoTenants(),
@@ -794,7 +825,12 @@
           monthlyRent: 3500,
           contractStart: '2026-01-01',
           contractEnd: '2026-04-28',
-          tenantType: 'rented',
+          tenantType: 'half_year',
+          lineBindingCode: '',
+          lineUserId: '',
+          lineDisplayName: '',
+          lineBoundAt: '',
+          expiryReminderSentAt: '',
           note: '每月匯款',
         },
         {
@@ -806,7 +842,12 @@
           monthlyRent: 3600,
           contractStart: '2025-12-01',
           contractEnd: '2026-12-01',
-          tenantType: 'rented',
+          tenantType: 'one_year',
+          lineBindingCode: '',
+          lineUserId: '',
+          lineDisplayName: '',
+          lineBoundAt: '',
+          expiryReminderSentAt: '',
           note: '',
         },
         {
@@ -819,6 +860,11 @@
           contractStart: '2025-01-01',
           contractEnd: '',
           tenantType: 'family',
+          lineBindingCode: '',
+          lineUserId: '',
+          lineDisplayName: '',
+          lineBoundAt: '',
+          expiryReminderSentAt: '',
           note: '家人自用',
         },
         {
@@ -831,6 +877,11 @@
           contractStart: '2025-01-01',
           contractEnd: '',
           tenantType: 'family',
+          lineBindingCode: '',
+          lineUserId: '',
+          lineDisplayName: '',
+          lineBoundAt: '',
+          expiryReminderSentAt: '',
           note: '家人自用',
         },
       ];
@@ -880,7 +931,7 @@
     function getTenantStatus(tenant) {
       if (tenant.tenantType === 'family') return 'family';
       const remaining = daysUntil(tenant.contractEnd);
-      if (tenant.contractEnd && remaining !== null && remaining <= state.settings.reminderDays) {
+      if (tenant.contractEnd && remaining !== null && remaining >= 0 && remaining <= ALERT_DAYS) {
         return 'expiring';
       }
       return 'rented';
@@ -888,6 +939,115 @@
 
     function getSpotTenant(spotNumber) {
       return state.tenants.find(t => Number(t.spotNumber) === Number(spotNumber)) || null;
+    }
+
+    function tenantHasLineBound(tenant) {
+      return Boolean(tenant.lineUserId);
+    }
+
+    function formatDateTime(dateStr) {
+      if (!dateStr) return '未設定';
+      const d = new Date(dateStr);
+      if (Number.isNaN(d.getTime())) return dateStr;
+      return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+
+    function generateBindingCode() {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let code = '';
+      do {
+        code = 'PARK-' + Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+      } while (state.tenants.some(t => t.lineBindingCode === code));
+      return code;
+    }
+
+    async function copyText(textToCopy, successMessage = '已複製') {
+      try {
+        await navigator.clipboard.writeText(textToCopy);
+        showToast(successMessage);
+      } catch (_) {
+        showToast('複製失敗，請手動複製');
+      }
+    }
+
+    function issueLineBindingCode(id) {
+      const tenant = state.tenants.find(t => t.id === id);
+      if (!tenant) return;
+      tenant.lineBindingCode = generateBindingCode();
+      tenant.lineUserId = '';
+      tenant.lineDisplayName = '';
+      tenant.lineBoundAt = '';
+      tenant.expiryReminderSentAt = '';
+      renderAll();
+      scheduleSave();
+      copyText(tenant.lineBindingCode, `已產生並複製綁定碼：${tenant.lineBindingCode}`);
+    }
+
+    function clearLineBinding(id) {
+      const tenant = state.tenants.find(t => t.id === id);
+      if (!tenant) return;
+      if (!confirm(`確定要清除 ${tenant.name} 的 LINE 綁定資料嗎？`)) return;
+      tenant.lineUserId = '';
+      tenant.lineDisplayName = '';
+      tenant.lineBoundAt = '';
+      tenant.expiryReminderSentAt = '';
+      renderAll();
+      scheduleSave();
+      showToast('已清除 LINE 綁定');
+    }
+
+    function resetLineBindingCode(id) {
+      const tenant = state.tenants.find(t => t.id === id);
+      if (!tenant) return;
+      tenant.lineBindingCode = generateBindingCode();
+      tenant.lineUserId = '';
+      tenant.lineDisplayName = '';
+      tenant.lineBoundAt = '';
+      tenant.expiryReminderSentAt = '';
+      renderAll();
+      scheduleSave();
+      copyText(tenant.lineBindingCode, `已重設並複製綁定碼：${tenant.lineBindingCode}`);
+    }
+
+    async function runReminderCheck() {
+      try {
+        const data = await api('line-reminder', {
+          method: 'POST',
+          body: JSON.stringify({ dryRun: false }),
+        });
+        const summary = document.getElementById('lineReminderSummary');
+        const parts = [
+          `已檢查 ${data.checked ?? 0} 位租戶`,
+          `符合提醒條件 ${data.matched ?? 0} 位`,
+          `成功發送 ${data.sent ?? 0} 位`,
+        ];
+        if (Array.isArray(data.skipped) && data.skipped.length) {
+          parts.push(`略過 ${data.skipped.length} 位`);
+        }
+        summary.textContent = parts.join('，') + '。';
+        if (Array.isArray(data.results) && data.results.length) {
+          console.table(data.results);
+        }
+        showToast(data.message || '提醒檢查完成');
+        await loadRemoteState();
+      } catch (err) {
+        document.getElementById('lineReminderSummary').textContent = `提醒執行失敗：${err.message}`;
+        showToast(`提醒執行失敗：${err.message}`);
+      }
+    }
+
+    function renderLineReminderSummary() {
+      const upcoming = state.tenants.filter(t => {
+        const days = daysUntil(t.contractEnd);
+        return t.tenantType !== 'family' && t.lineUserId && t.contractEnd && days !== null && days >= 0 && days <= ALERT_DAYS && !t.expiryReminderSentAt;
+      });
+      const summary = document.getElementById('lineReminderSummary');
+      if (!summary) return;
+      if (!upcoming.length) {
+        summary.textContent = '目前沒有符合「7 天內到期且尚未提醒」的 LINE 租戶。';
+        return;
+      }
+      summary.textContent = `目前有 ${upcoming.length} 位租戶符合「7 天內到期且尚未提醒」條件，可手動執行一次提醒。`;
     }
 
     function renderAll() {
@@ -901,6 +1061,7 @@
       syncReportControls();
       renderReportSummary();
       syncSettingsUI();
+      renderLineReminderSummary();
       fillSpotOptions();
       fillPaymentTenantOptions();
     }
@@ -916,10 +1077,10 @@
 
       document.getElementById('stats').innerHTML = `
         <div class="card stat-card"><h3>空車位</h3><div class="value">${empty}</div><div class="desc">尚可出租的車位數</div></div>
-        <div class="card stat-card"><h3>已租出</h3><div class="value">${occupied - familyCount}</div><div class="desc">一般月租車位</div></div>
-        <div class="card stat-card"><h3>即將到期</h3><div class="value">${expiring}</div><div class="desc">${state.settings.reminderDays} 天內到期</div></div>
+        <div class="card stat-card"><h3>已租出</h3><div class="value">${occupied - familyCount}</div><div class="desc">半年租 / 一年租車位</div></div>
+        <div class="card stat-card"><h3>即將到期</h3><div class="value">${expiring}</div><div class="desc">7 天內到期</div></div>
         <div class="card stat-card"><h3>家人自用</h3><div class="value">${familyCount}</div><div class="desc">留給家人的固定車位</div></div>
-        <div class="card stat-card"><h3>預估月收</h3><div class="value" style="font-size:28px;">${formatCurrency(monthlyRevenue)}</div><div class="desc">以目前一般月租資料推估</div></div>
+        <div class="card stat-card"><h3>預估月收</h3><div class="value" style="font-size:28px;">${formatCurrency(monthlyRevenue)}</div><div class="desc">以目前非家人自用資料推估</div></div>
       `;
     }
 
@@ -949,11 +1110,14 @@
     function renderAlerts() {
       const container = document.getElementById('alertsList');
       const alerts = state.tenants
-        .filter(t => getTenantStatus(t) === 'expiring')
+        .filter(t => {
+          const days = daysUntil(t.contractEnd);
+          return t.tenantType !== 'family' && t.contractEnd && days !== null && days >= 0 && days <= ALERT_DAYS;
+        })
         .sort((a, b) => daysUntil(a.contractEnd) - daysUntil(b.contractEnd));
 
       if (!alerts.length) {
-        container.innerHTML = `<div class="tenant-item"><div class="tenant-name">目前沒有即將到期的租戶</div><div class="meta">乾乾淨淨，今天不用追著合約跑。</div></div>`;
+        container.innerHTML = `<div class="tenant-item"><div class="tenant-name">目前沒有 7 天內到期的租戶</div><div class="meta">乾乾淨淨，今天不用追著合約跑。</div></div>`;
         return;
       }
 
@@ -983,8 +1147,17 @@
       if (keyword) {
         tenants = tenants.filter(t => [t.name, t.phone, t.plate, String(t.spotNumber)].join(' ').toLowerCase().includes(keyword));
       }
-      if (filter !== 'all') {
-        tenants = tenants.filter(t => getTenantStatus(t) === filter);
+      if (filter === 'family') {
+        tenants = tenants.filter(t => t.tenantType === 'family');
+      } else if (filter === 'half_year') {
+        tenants = tenants.filter(t => t.tenantType === 'half_year');
+      } else if (filter === 'one_year') {
+        tenants = tenants.filter(t => t.tenantType === 'one_year');
+      } else if (filter === 'expiring') {
+        tenants = tenants.filter(t => {
+          const days = daysUntil(t.contractEnd);
+          return t.tenantType !== 'family' && t.contractEnd && days !== null && days >= 0 && days <= ALERT_DAYS;
+        });
       }
 
       if (!tenants.length) {
@@ -995,6 +1168,7 @@
       list.innerHTML = tenants.map(t => {
         const status = getTenantStatus(t);
         const days = t.contractEnd ? daysUntil(t.contractEnd) : null;
+        const isBound = tenantHasLineBound(t);
         return `
           <div class="tenant-item">
             <div class="tenant-head">
@@ -1002,13 +1176,32 @@
                 <div class="tenant-name">${escapeHtml(t.name)}</div>
                 <div class="meta">車位 ${t.spotNumber} ・ ${escapeHtml(t.plate)} ・ ${escapeHtml(t.phone)}</div>
               </div>
-              <span class="badge ${status}">${statusText(status)}</span>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+                <span class="badge ${t.tenantType}">${tenantTypeText(t.tenantType)}</span>
+                ${status === 'expiring' ? `<span class="badge expiring">7 天內到期</span>` : ''}
+                <span class="badge ${isBound ? 'line-bound' : 'line-unbound'}">${isBound ? 'LINE 已綁定' : 'LINE 未綁定'}</span>
+              </div>
             </div>
             <div class="meta">
-              月租金：${formatCurrency(t.monthlyRent)}<br>
+              應收租金：${formatCurrency(t.monthlyRent)}<br>
               合約：${formatDate(t.contractStart)} ～ ${formatDate(t.contractEnd)}
               ${days !== null ? `<br>距離到期：${days} 天` : '<br>距離到期：未設定'}
+              ${t.expiryReminderSentAt ? `<br>最近提醒：${formatDateTime(t.expiryReminderSentAt)}` : '<br>最近提醒：尚未發送'}
               ${t.note ? `<br>備註：${escapeHtml(t.note)}` : ''}
+            </div>
+            <div class="line-box">
+              <div class="meta"><strong>LINE 綁定</strong></div>
+              ${t.lineBindingCode ? `<div class="line-code">${escapeHtml(t.lineBindingCode)}</div>` : '<div class="meta">尚未產生綁定碼</div>'}
+              <div class="meta">
+                ${isBound
+                  ? `已綁定：${escapeHtml(t.lineDisplayName || '此 LINE 使用者')}<br>綁定時間：${formatDateTime(t.lineBoundAt)}`
+                  : '請租戶先加入官方帳號好友，再把綁定碼傳給官方帳號。'}
+              </div>
+              <div class="inline-actions">
+                ${t.lineBindingCode ? `<button class="btn-light" onclick="copyTenantBindingCode('${t.id}')">複製綁定碼</button>` : `<button class="btn-light" onclick="issueLineBindingCode('${t.id}')">產生綁定碼</button>`}
+                ${t.lineBindingCode ? `<button class="btn-light" onclick="resetLineBindingCode('${t.id}')">重設綁定碼</button>` : ''}
+                ${isBound ? `<button class="btn-light" onclick="clearLineBinding('${t.id}')">清除綁定</button>` : ''}
+              </div>
             </div>
             <div class="inline-actions">
               <button class="btn-light" onclick="openTenantModal('${t.id}')">編輯</button>
@@ -1102,7 +1295,7 @@
     }
 
     function getTenantLabelType(tenant) {
-      return tenant?.tenantType === 'family' ? '家人自用' : '一般月租';
+      return tenantTypeText(tenant?.tenantType || '');
     }
 
     function formatDateTime(date) {
@@ -1245,8 +1438,8 @@
 
     function syncSettingsUI() {
       document.getElementById('lotNameInput').value = state.settings.lotName;
-      document.getElementById('reminderDaysInput').value = state.settings.reminderDays;
-      document.getElementById('settingsReminderDays').value = state.settings.reminderDays;
+      document.getElementById('reminderDaysInput').value = ALERT_DAYS;
+      document.getElementById('settingsReminderDays').value = `到期前 ${ALERT_DAYS} 天通知一次`;
       document.getElementById('familyRentDefault').value = state.settings.familyRentDefault;
     }
 
@@ -1281,7 +1474,14 @@
     function statusText(status) {
       return ({ empty: '空車位', rented: '已租出', expiring: '即將到期', family: '家人自用' })[status] || status;
     }
-
+    function tenantTypeText(type) {
+      return {
+        family: '家人自用',
+        half_year: '半年租',
+        one_year: '一年租',
+      }[type] || type;
+    }
+    
     function openTenantModal(id = null, presetSpot = null) {
       const modal = document.getElementById('tenantModal');
       const title = document.getElementById('tenantModalTitle');
@@ -1289,7 +1489,7 @@
       form.reset();
       document.getElementById('tenantId').value = '';
       document.getElementById('contractEnd').value = '';
-      document.getElementById('tenantType').value = 'rented';
+      document.getElementById('tenantType').value = 'half_year';
       document.getElementById('monthlyRent').value = 0;
       document.getElementById('contractStart').value = todayStr;
       document.getElementById('note').value = '';
@@ -1305,7 +1505,7 @@
         document.getElementById('monthlyRent').value = tenant.monthlyRent;
         document.getElementById('contractStart').value = tenant.contractStart || todayStr;
         document.getElementById('contractEnd').value = tenant.contractEnd || '';
-        document.getElementById('tenantType').value = tenant.tenantType || 'rented';
+        document.getElementById('tenantType').value = tenant.tenantType || 'half_year';
         document.getElementById('note').value = tenant.note || '';
         fillSpotOptions(tenant.spotNumber);
       } else {
@@ -1504,8 +1704,18 @@
     function normalizeState(raw) {
       const base = defaultState();
       return {
-        settings: { ...base.settings, ...(raw.settings || {}) },
-        tenants: Array.isArray(raw.tenants) ? raw.tenants : [],
+        settings: { ...base.settings, ...(raw.settings || {}), reminderDays: ALERT_DAYS },
+        tenants: Array.isArray(raw.tenants)
+          ? raw.tenants.map(t => ({
+              lineBindingCode: '',
+              lineUserId: '',
+              lineDisplayName: '',
+              lineBoundAt: '',
+              expiryReminderSentAt: '',
+              ...t,
+              tenantType: t.tenantType === 'rented' ? 'half_year' : (t.tenantType || 'half_year'),
+            }))
+          : [],
         payments: Array.isArray(raw.payments) ? raw.payments : [],
       };
     }
@@ -1623,16 +1833,16 @@
 
     document.getElementById('tenantSearch').addEventListener('input', renderTenantList);
     document.getElementById('tenantFilter').addEventListener('change', renderTenantList);
-    document.getElementById('reminderDaysInput').addEventListener('change', e => {
-      state.settings.reminderDays = Number(e.target.value || 30);
-      document.getElementById('settingsReminderDays').value = state.settings.reminderDays;
+    document.getElementById('reminderDaysInput').addEventListener('change', () => {
+      state.settings.reminderDays = ALERT_DAYS;
+      document.getElementById('settingsReminderDays').value = `到期前 ${ALERT_DAYS} 天通知一次`;
       renderAll();
       scheduleSave();
     });
 
     document.getElementById('saveSettingsBtn').addEventListener('click', () => {
       state.settings.lotName = document.getElementById('lotNameInput').value.trim() || '何家月租停車場';
-      state.settings.reminderDays = Number(document.getElementById('settingsReminderDays').value || 30);
+      state.settings.reminderDays = ALERT_DAYS;
       state.settings.familyRentDefault = Number(document.getElementById('familyRentDefault').value || 0);
       renderAll();
       scheduleSave();
@@ -1689,11 +1899,19 @@
       if (e.key === 'Enter') login();
     });
     document.getElementById('logoutBtn').addEventListener('click', logout);
+    document.getElementById('runReminderCheckBtn').addEventListener('click', runReminderCheck);
 
     window.openTenantModal = openTenantModal;
     window.openPaymentModal = openPaymentModal;
     window.deleteTenant = deleteTenant;
     window.deletePayment = deletePayment;
+    window.issueLineBindingCode = issueLineBindingCode;
+    window.resetLineBindingCode = resetLineBindingCode;
+    window.clearLineBinding = clearLineBinding;
+    window.copyTenantBindingCode = (id) => {
+      const tenant = state.tenants.find(t => t.id === id);
+      if (tenant?.lineBindingCode) copyText(tenant.lineBindingCode, '綁定碼已複製');
+    };
 
     checkSession();
   </script>
