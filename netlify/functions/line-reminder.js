@@ -30,10 +30,10 @@ function daysUntil(dateStr) {
 
 function buildMessage(tenant, daysLeft) {
   return [
-    '何家停車場提醒',
+    '🚗 何家停車場提醒',
     `您好，${tenant.name}（車位 ${tenant.spotNumber}）的租約將於 ${tenant.contractEnd} 到期。`,
     `目前距離到期還有 ${daysLeft} 天。`,
-    '若需續租，請盡快與我們聯絡，謝謝。',
+    '若需續租，請盡快與我們聯絡，謝謝 🙏',
   ].join('\n');
 }
 
@@ -59,7 +59,7 @@ async function pushMessage(userId, accessToken, text) {
 async function loadState(supabase) {
   const { data, error } = await supabase
     .from('app_state')
-    .select('state, updated_at')
+    .select('state')
     .eq('key_name', 'home_parking')
     .maybeSingle();
 
@@ -84,39 +84,26 @@ async function saveState(supabase, state) {
 
 exports.handler = async (event) => {
   const { LINE_CHANNEL_ACCESS_TOKEN } = process.env;
+
   if (!LINE_CHANNEL_ACCESS_TOKEN) {
-    return json(500, { error: '伺服器尚未設定 LINE_CHANNEL_ACCESS_TOKEN' });
+    return json(500, { error: '未設定 LINE_CHANNEL_ACCESS_TOKEN' });
   }
 
-  let dryRun = false;
-
   try {
-    if (event.httpMethod === 'GET' && event.queryStringParameters?.dryRun === '1') {
-      dryRun = true;
-    }
-
-    if (event.httpMethod === 'POST' && event.body) {
-      try {
-        const body = JSON.parse(event.body || '{}');
-        dryRun = Boolean(body.dryRun);
-      } catch {
-        return json(400, { error: 'JSON 格式錯誤' });
-      }
-    }
-
     const supabase = getSupabase();
     const appState = await loadState(supabase);
     const tenants = Array.isArray(appState?.tenants) ? appState.tenants : [];
 
     const results = [];
     const skipped = [];
+
     let matched = 0;
-    let checked = tenants.length;
     let sent = 0;
+    let checked = tenants.length;
 
-    console.log(`line-reminder triggered, tenants=${checked}, dryRun=${dryRun}`);
+    console.log(`🔥 line-reminder triggered, tenants=${checked}`);
 
-    for (let i = 0; i < tenants.length; i += 1) {
+    for (let i = 0; i < tenants.length; i++) {
       const tenant = tenants[i];
       const daysLeft = daysUntil(tenant.contractEnd);
 
@@ -132,54 +119,58 @@ exports.handler = async (event) => {
       if (!shouldNotify) {
         skipped.push({
           name: tenant.name,
-          spotNumber: tenant.spotNumber,
-          reason: !tenant.lineUserId
-            ? '未綁定 LINE'
-            : tenant.tenantType === 'family'
-              ? '家人自用不通知'
+          reason:
+            !tenant.lineUserId
+              ? '未綁定 LINE'
+              : tenant.tenantType === 'family'
+              ? '家人自用'
               : tenant.expiryReminderSentAt
-                ? '已通知過'
-                : '不在 7 天內',
+              ? '已通知過'
+              : '不在7天內',
         });
         continue;
       }
 
-      matched += 1;
+      matched++;
+
       const message = buildMessage(tenant, daysLeft);
 
-      if (dryRun) {
+      try {
+        await pushMessage(
+          tenant.lineUserId,
+          LINE_CHANNEL_ACCESS_TOKEN,
+          message
+        );
+
+        tenants[i] = {
+          ...tenant,
+          expiryReminderSentAt: new Date().toISOString(),
+        };
+
+        sent++;
+
         results.push({
           name: tenant.name,
-          spotNumber: tenant.spotNumber,
-          daysLeft,
-          sent: false,
-          dryRun: true,
-          message,
+          sent: true,
         });
-        continue;
+      } catch (err) {
+        console.error('LINE 發送失敗:', err);
+        results.push({
+          name: tenant.name,
+          sent: false,
+          error: err.message,
+        });
       }
-
-      await pushMessage(tenant.lineUserId, LINE_CHANNEL_ACCESS_TOKEN, message);
-
-      tenants[i] = {
-        ...tenant,
-        expiryReminderSentAt: new Date().toISOString(),
-      };
-
-      sent += 1;
-      results.push({
-        name: tenant.name,
-        spotNumber: tenant.spotNumber,
-        daysLeft,
-        sent: true,
-      });
     }
 
-    if (!dryRun && appState) {
+    if (appState) {
       await saveState(supabase, { ...appState, tenants });
     }
 
-    console.log(`line-reminder finished, matched=${matched}, sent=${sent}`);
+    console.log('matched:', matched);
+    console.log('sent:', sent);
+    console.log('skipped:', JSON.stringify(skipped, null, 2));
+    console.log('results:', JSON.stringify(results, null, 2));
 
     return json(200, {
       ok: true,
@@ -188,13 +179,9 @@ exports.handler = async (event) => {
       sent,
       skipped,
       results,
-      dryRun,
-      message: dryRun
-        ? `預覽完成，共 ${matched} 位符合 7 天內提醒條件。`
-        : `提醒檢查完成，共發送 ${sent} 則 LINE 通知。`,
     });
   } catch (err) {
-    console.error('line-reminder failed:', err);
-    return json(500, { error: err.message || '提醒執行失敗' });
+    console.error('❌ line-reminder failed:', err);
+    return json(500, { error: err.message });
   }
 };
