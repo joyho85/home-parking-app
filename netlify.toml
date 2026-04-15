@@ -4,6 +4,5 @@
 [functions]
   directory = "netlify/functions"
 
-[[scheduled.functions]]
-  name = "line-reminder"
-  cron = "*/5 * * * *"
+[functions."line-reminder"]
+  schedule = "*/5 * * * *"
