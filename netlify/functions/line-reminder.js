@@ -60,7 +60,7 @@ async function loadState(supabase) {
   const { data, error } = await supabase
     .from('app_state')
     .select('state')
-    .eq('key_name', 'home_parking')
+    .eq('key', 'home_parking')
     .maybeSingle();
 
   if (error) throw new Error(error.message);
@@ -72,11 +72,11 @@ async function saveState(supabase, state) {
     .from('app_state')
     .upsert(
       {
-        key_name: 'home_parking',
+        key: 'home_parking',
         state,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: 'key_name' }
+      { onConflict: 'key' }
     );
 
   if (error) throw new Error(error.message);
