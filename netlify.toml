@@ -5,4 +5,4 @@
   directory = "netlify/functions"
 
 [functions."line-reminder"]
-  schedule = "*/5 * * * *"
+  schedule = "0 9 * * *"
