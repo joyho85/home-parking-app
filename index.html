@@ -671,10 +671,11 @@
 
           <div class="card">
             <h2>LINE 到期提醒</h2>
-            <div class="muted">目前規則是「租約到期前 7 天，只通知一次」。先幫租戶綁定 LINE，之後可手動執行一次提醒測試。等你確認內容沒問題，再加自動排程。</div>
+            <div class="muted">目前規則是「租約到期前 7 天，只通知一次」，而且只通知管理員，不會直接推播給租戶。請先用管理員自己的 LINE 加入官方帳號好友，然後傳送 <strong>ADMIN-BIND</strong> 完成管理員綁定。</div>
             <div class="inline-actions">
               <button class="btn-light" id="runReminderCheckBtn">手動執行 7 天內提醒</button>
             </div>
+            <div id="lineAdminStatus" class="footer-note">管理員 LINE 尚未綁定。</div>
             <div id="lineReminderSummary" class="footer-note">尚未執行提醒檢查。</div>
           </div>
 
@@ -941,9 +942,6 @@
       return state.tenants.find(t => Number(t.spotNumber) === Number(spotNumber)) || null;
     }
 
-    function tenantHasLineBound(tenant) {
-      return Boolean(tenant.lineUserId);
-    }
 
     function formatDateTime(dateStr) {
       if (!dateStr) return '未設定';
@@ -952,14 +950,6 @@
       return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     }
 
-    function generateBindingCode() {
-      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-      let code = '';
-      do {
-        code = 'PARK-' + Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-      } while (state.tenants.some(t => t.lineBindingCode === code));
-      return code;
-    }
 
     async function copyText(textToCopy, successMessage = '已複製') {
       try {
@@ -970,44 +960,8 @@
       }
     }
 
-    function issueLineBindingCode(id) {
-      const tenant = state.tenants.find(t => t.id === id);
-      if (!tenant) return;
-      tenant.lineBindingCode = generateBindingCode();
-      tenant.lineUserId = '';
-      tenant.lineDisplayName = '';
-      tenant.lineBoundAt = '';
-      tenant.expiryReminderSentAt = '';
-      renderAll();
-      scheduleSave();
-      copyText(tenant.lineBindingCode, `已產生並複製綁定碼：${tenant.lineBindingCode}`);
-    }
 
-    function clearLineBinding(id) {
-      const tenant = state.tenants.find(t => t.id === id);
-      if (!tenant) return;
-      if (!confirm(`確定要清除 ${tenant.name} 的 LINE 綁定資料嗎？`)) return;
-      tenant.lineUserId = '';
-      tenant.lineDisplayName = '';
-      tenant.lineBoundAt = '';
-      tenant.expiryReminderSentAt = '';
-      renderAll();
-      scheduleSave();
-      showToast('已清除 LINE 綁定');
-    }
 
-    function resetLineBindingCode(id) {
-      const tenant = state.tenants.find(t => t.id === id);
-      if (!tenant) return;
-      tenant.lineBindingCode = generateBindingCode();
-      tenant.lineUserId = '';
-      tenant.lineDisplayName = '';
-      tenant.lineBoundAt = '';
-      tenant.expiryReminderSentAt = '';
-      renderAll();
-      scheduleSave();
-      copyText(tenant.lineBindingCode, `已重設並複製綁定碼：${tenant.lineBindingCode}`);
-    }
 
     async function runReminderCheck() {
       try {
@@ -1019,7 +973,7 @@
         const parts = [
           `已檢查 ${data.checked ?? 0} 位租戶`,
           `符合提醒條件 ${data.matched ?? 0} 位`,
-          `成功發送 ${data.sent ?? 0} 位`,
+          `成功發送 ${data.sent ?? 0} 則管理員通知`,
         ];
         if (Array.isArray(data.skipped) && data.skipped.length) {
           parts.push(`略過 ${data.skipped.length} 位`);
@@ -1037,17 +991,34 @@
     }
 
     function renderLineReminderSummary() {
+      const summary = document.getElementById('lineReminderSummary');
+      const adminStatus = document.getElementById('lineAdminStatus');
+      if (!summary) return;
+
+      const adminName = state.settings?.lineAdminDisplayName || '';
+      const adminBoundAt = state.settings?.lineAdminBoundAt || '';
+      const adminUserId = state.settings?.lineAdminUserId || '';
+      if (adminStatus) {
+        adminStatus.innerHTML = adminUserId
+          ? `管理員 LINE 已綁定：${escapeHtml(adminName || '此 LINE 使用者')}<br>綁定時間：${formatDateTime(adminBoundAt)}`
+          : '管理員 LINE 尚未綁定。請用管理員 LINE 傳送 ADMIN-BIND 給官方帳號完成綁定。';
+      }
+
       const upcoming = state.tenants.filter(t => {
         const days = daysUntil(t.contractEnd);
-        return t.tenantType !== 'family' && t.lineUserId && t.contractEnd && days !== null && days >= 0 && days <= ALERT_DAYS && !t.expiryReminderSentAt;
+        return t.tenantType !== 'family' && t.contractEnd && days !== null && days >= 0 && days <= ALERT_DAYS && !t.expiryReminderSentAt;
       });
-      const summary = document.getElementById('lineReminderSummary');
-      if (!summary) return;
-      if (!upcoming.length) {
-        summary.textContent = '目前沒有符合「7 天內到期且尚未提醒」的 LINE 租戶。';
+
+      if (!adminUserId) {
+        summary.textContent = '尚未綁定管理員 LINE，因此即使有到期租戶也不會發送通知。';
         return;
       }
-      summary.textContent = `目前有 ${upcoming.length} 位租戶符合「7 天內到期且尚未提醒」條件，可手動執行一次提醒。`;
+
+      if (!upcoming.length) {
+        summary.textContent = '目前沒有符合「7 天內到期且尚未提醒」的租戶。';
+        return;
+      }
+      summary.textContent = `目前有 ${upcoming.length} 位租戶符合「7 天內到期且尚未提醒」條件，可手動執行一次提醒給管理員。`;
     }
 
     function renderAll() {
@@ -1168,7 +1139,6 @@
       list.innerHTML = tenants.map(t => {
         const status = getTenantStatus(t);
         const days = t.contractEnd ? daysUntil(t.contractEnd) : null;
-        const isBound = tenantHasLineBound(t);
         return `
           <div class="tenant-item">
             <div class="tenant-head">
@@ -1179,7 +1149,6 @@
               <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
                 <span class="badge ${t.tenantType}">${tenantTypeText(t.tenantType)}</span>
                 ${status === 'expiring' ? `<span class="badge expiring">7 天內到期</span>` : ''}
-                <span class="badge ${isBound ? 'line-bound' : 'line-unbound'}">${isBound ? 'LINE 已綁定' : 'LINE 未綁定'}</span>
               </div>
             </div>
             <div class="meta">
@@ -1188,20 +1157,6 @@
               ${days !== null ? `<br>距離到期：${days} 天` : '<br>距離到期：未設定'}
               ${t.expiryReminderSentAt ? `<br>最近提醒：${formatDateTime(t.expiryReminderSentAt)}` : '<br>最近提醒：尚未發送'}
               ${t.note ? `<br>備註：${escapeHtml(t.note)}` : ''}
-            </div>
-            <div class="line-box">
-              <div class="meta"><strong>LINE 綁定</strong></div>
-              ${t.lineBindingCode ? `<div class="line-code">${escapeHtml(t.lineBindingCode)}</div>` : '<div class="meta">尚未產生綁定碼</div>'}
-              <div class="meta">
-                ${isBound
-                  ? `已綁定：${escapeHtml(t.lineDisplayName || '此 LINE 使用者')}<br>綁定時間：${formatDateTime(t.lineBoundAt)}`
-                  : '請租戶先加入官方帳號好友，再把綁定碼傳給官方帳號。'}
-              </div>
-              <div class="inline-actions">
-                ${t.lineBindingCode ? `<button class="btn-light" onclick="copyTenantBindingCode('${t.id}')">複製綁定碼</button>` : `<button class="btn-light" onclick="issueLineBindingCode('${t.id}')">產生綁定碼</button>`}
-                ${t.lineBindingCode ? `<button class="btn-light" onclick="resetLineBindingCode('${t.id}')">重設綁定碼</button>` : ''}
-                ${isBound ? `<button class="btn-light" onclick="clearLineBinding('${t.id}')">清除綁定</button>` : ''}
-              </div>
             </div>
             <div class="inline-actions">
               <button class="btn-light" onclick="openTenantModal('${t.id}')">編輯</button>
@@ -1905,13 +1860,6 @@
     window.openPaymentModal = openPaymentModal;
     window.deleteTenant = deleteTenant;
     window.deletePayment = deletePayment;
-    window.issueLineBindingCode = issueLineBindingCode;
-    window.resetLineBindingCode = resetLineBindingCode;
-    window.clearLineBinding = clearLineBinding;
-    window.copyTenantBindingCode = (id) => {
-      const tenant = state.tenants.find(t => t.id === id);
-      if (tenant?.lineBindingCode) copyText(tenant.lineBindingCode, '綁定碼已複製');
-    };
 
     checkSession();
   </script>
