@@ -30,7 +30,7 @@ function daysUntil(dateStr) {
 
 function buildMessage(tenant, daysLeft) {
   return [
-    '🚗 何家停車場提醒',
+    '🚗 圳民停車場提醒',
     `您好，${tenant.name}（車位 ${tenant.spotNumber}）的租約將於 ${tenant.contractEnd} 到期。`,
     `目前距離到期還有 ${daysLeft} 天。`,
     '若需續租，請盡快與我們聯絡，謝謝 🙏',
