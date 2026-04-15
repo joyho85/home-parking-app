@@ -1,5 +1,4 @@
 const { createClient } = require('@supabase/supabase-js');
-const { json, requireSession, corsHeaders } = require('./_common');
 
 const ALERT_DAYS = 7;
 
@@ -11,6 +10,14 @@ function getSupabase() {
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+}
+
+function json(statusCode, body) {
+  return {
+    statusCode,
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    body: JSON.stringify(body),
+  };
 }
 
 function daysUntil(dateStr) {
@@ -53,7 +60,7 @@ async function loadState(supabase) {
   const { data, error } = await supabase
     .from('app_state')
     .select('state, updated_at')
-    .eq('key', 'home_parking')
+    .eq('key_name', 'home_parking')
     .maybeSingle();
 
   if (error) throw new Error(error.message);
@@ -63,45 +70,40 @@ async function loadState(supabase) {
 async function saveState(supabase, state) {
   const { error } = await supabase
     .from('app_state')
-    .upsert({
-      key: 'home_parking',
-      state,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'key' });
+    .upsert(
+      {
+        key_name: 'home_parking',
+        state,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'key_name' }
+    );
 
   if (error) throw new Error(error.message);
 }
 
 exports.handler = async (event) => {
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 204, headers: corsHeaders(), body: '' };
-  }
-
-  const auth = requireSession(event);
-  if (!auth.ok) {
-    return { ...auth.response, headers: { ...(auth.response.headers || {}), ...corsHeaders() } };
-  }
-
-  if (!['GET', 'POST'].includes(event.httpMethod)) {
-    return json(405, { error: 'Method not allowed' }, corsHeaders());
-  }
-
   const { LINE_CHANNEL_ACCESS_TOKEN } = process.env;
   if (!LINE_CHANNEL_ACCESS_TOKEN) {
-    return json(500, { error: '伺服器尚未設定 LINE_CHANNEL_ACCESS_TOKEN' }, corsHeaders());
+    return json(500, { error: '伺服器尚未設定 LINE_CHANNEL_ACCESS_TOKEN' });
   }
 
-  let dryRun = event.httpMethod === 'GET';
-  if (event.httpMethod === 'POST' && event.body) {
-    try {
-      const body = JSON.parse(event.body || '{}');
-      dryRun = Boolean(body.dryRun);
-    } catch {
-      return json(400, { error: 'JSON 格式錯誤' }, corsHeaders());
-    }
-  }
+  let dryRun = false;
 
   try {
+    if (event.httpMethod === 'GET' && event.queryStringParameters?.dryRun === '1') {
+      dryRun = true;
+    }
+
+    if (event.httpMethod === 'POST' && event.body) {
+      try {
+        const body = JSON.parse(event.body || '{}');
+        dryRun = Boolean(body.dryRun);
+      } catch {
+        return json(400, { error: 'JSON 格式錯誤' });
+      }
+    }
+
     const supabase = getSupabase();
     const appState = await loadState(supabase);
     const tenants = Array.isArray(appState?.tenants) ? appState.tenants : [];
@@ -111,6 +113,8 @@ exports.handler = async (event) => {
     let matched = 0;
     let checked = tenants.length;
     let sent = 0;
+
+    console.log(`line-reminder triggered, tenants=${checked}, dryRun=${dryRun}`);
 
     for (let i = 0; i < tenants.length; i += 1) {
       const tenant = tenants[i];
@@ -156,10 +160,12 @@ exports.handler = async (event) => {
       }
 
       await pushMessage(tenant.lineUserId, LINE_CHANNEL_ACCESS_TOKEN, message);
+
       tenants[i] = {
         ...tenant,
         expiryReminderSentAt: new Date().toISOString(),
       };
+
       sent += 1;
       results.push({
         name: tenant.name,
@@ -173,6 +179,8 @@ exports.handler = async (event) => {
       await saveState(supabase, { ...appState, tenants });
     }
 
+    console.log(`line-reminder finished, matched=${matched}, sent=${sent}`);
+
     return json(200, {
       ok: true,
       checked,
@@ -184,9 +192,9 @@ exports.handler = async (event) => {
       message: dryRun
         ? `預覽完成，共 ${matched} 位符合 7 天內提醒條件。`
         : `提醒檢查完成，共發送 ${sent} 則 LINE 通知。`,
-    }, corsHeaders());
+    });
   } catch (err) {
     console.error('line-reminder failed:', err);
-    return json(500, { error: err.message || '提醒執行失敗' }, corsHeaders());
+    return json(500, { error: err.message || '提醒執行失敗' });
   }
 };
