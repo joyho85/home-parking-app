@@ -1,6 +1,15 @@
 const { createClient } = require('@supabase/supabase-js');
 
 const ALERT_DAYS = 7;
+const APP_STATE_KEY = 'home_parking';
+
+function json(statusCode, body) {
+  return {
+    statusCode,
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    body: JSON.stringify(body),
+  };
+}
 
 function getSupabase() {
   const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env;
@@ -12,14 +21,6 @@ function getSupabase() {
   });
 }
 
-function json(statusCode, body) {
-  return {
-    statusCode,
-    headers: { 'Content-Type': 'application/json; charset=utf-8' },
-    body: JSON.stringify(body),
-  };
-}
-
 function daysUntil(dateStr) {
   if (!dateStr) return null;
   const todayStart = new Date();
@@ -28,13 +29,19 @@ function daysUntil(dateStr) {
   return Math.ceil((target - todayStart) / (1000 * 60 * 60 * 24));
 }
 
-function buildMessage(tenant, daysLeft) {
-  return [
-    '🚗 圳民停車場提醒',
-    `您好，${tenant.name}（車位 ${tenant.spotNumber}）的租約將於 ${tenant.contractEnd} 到期。`,
-    `目前距離到期還有 ${daysLeft} 天。`,
-    '若需續租，請盡快與我們聯絡，謝謝 🙏',
-  ].join('\n');
+function buildAdminMessage(matchedTenants) {
+  const header = [
+    '何家停車場提醒',
+    `以下共有 ${matchedTenants.length} 位租戶已進入到期前 7 天，請主動聯絡處理：`,
+    '',
+  ];
+
+  const lines = matchedTenants.map((tenant) => {
+    const daysLeft = daysUntil(tenant.contractEnd);
+    return `• ${tenant.name}｜車位 ${tenant.spotNumber}｜到期日 ${tenant.contractEnd}｜剩 ${daysLeft} 天`;
+  });
+
+  return [...header, ...lines].join('\n');
 }
 
 async function pushMessage(userId, accessToken, text) {
@@ -60,7 +67,7 @@ async function loadState(supabase) {
   const { data, error } = await supabase
     .from('app_state')
     .select('state')
-    .eq('key', 'home_parking')
+    .eq('key', APP_STATE_KEY)
     .maybeSingle();
 
   if (error) throw new Error(error.message);
@@ -72,7 +79,7 @@ async function saveState(supabase, state) {
     .from('app_state')
     .upsert(
       {
-        key: 'home_parking',
+        key: APP_STATE_KEY,
         state,
         updated_at: new Date().toISOString(),
       },
@@ -82,8 +89,8 @@ async function saveState(supabase, state) {
   if (error) throw new Error(error.message);
 }
 
-exports.handler = async (event) => {
-  const { LINE_CHANNEL_ACCESS_TOKEN } = process.env;
+exports.handler = async () => {
+  const { LINE_CHANNEL_ACCESS_TOKEN, LINE_ADMIN_USER_ID } = process.env;
 
   if (!LINE_CHANNEL_ACCESS_TOKEN) {
     return json(500, { error: '未設定 LINE_CHANNEL_ACCESS_TOKEN' });
@@ -92,24 +99,26 @@ exports.handler = async (event) => {
   try {
     const supabase = getSupabase();
     const appState = await loadState(supabase);
-    const tenants = Array.isArray(appState?.tenants) ? appState.tenants : [];
+    if (!appState) {
+      return json(404, { error: '找不到 app_state' });
+    }
 
-    const results = [];
+    const settings = appState.settings || {};
+    const adminUserId = settings.lineAdminUserId || LINE_ADMIN_USER_ID || '';
+    if (!adminUserId) {
+      return json(400, { error: '尚未綁定管理員 LINE，請先用管理員 LINE 傳送 ADMIN-BIND 給官方帳號。' });
+    }
+
+    const tenants = Array.isArray(appState.tenants) ? appState.tenants : [];
+    const matchedTenants = [];
     const skipped = [];
 
-    let matched = 0;
-    let sent = 0;
-    let checked = tenants.length;
-
-    console.log(`🔥 line-reminder triggered, tenants=${checked}`);
-
-    for (let i = 0; i < tenants.length; i++) {
+    for (let i = 0; i < tenants.length; i += 1) {
       const tenant = tenants[i];
       const daysLeft = daysUntil(tenant.contractEnd);
 
       const shouldNotify =
         tenant.tenantType !== 'family' &&
-        tenant.lineUserId &&
         tenant.contractEnd &&
         daysLeft !== null &&
         daysLeft >= 0 &&
@@ -119,69 +128,61 @@ exports.handler = async (event) => {
       if (!shouldNotify) {
         skipped.push({
           name: tenant.name,
-          reason:
-            !tenant.lineUserId
-              ? '未綁定 LINE'
-              : tenant.tenantType === 'family'
-              ? '家人自用'
-              : tenant.expiryReminderSentAt
+          spotNumber: tenant.spotNumber,
+          reason: tenant.tenantType === 'family'
+            ? '家人自用不通知'
+            : tenant.expiryReminderSentAt
               ? '已通知過'
-              : '不在7天內',
+              : '不在 7 天內',
         });
         continue;
       }
 
-      matched++;
-
-      const message = buildMessage(tenant, daysLeft);
-
-      try {
-        await pushMessage(
-          tenant.lineUserId,
-          LINE_CHANNEL_ACCESS_TOKEN,
-          message
-        );
-
-        tenants[i] = {
-          ...tenant,
-          expiryReminderSentAt: new Date().toISOString(),
-        };
-
-        sent++;
-
-        results.push({
-          name: tenant.name,
-          sent: true,
-        });
-      } catch (err) {
-        console.error('LINE 發送失敗:', err);
-        results.push({
-          name: tenant.name,
-          sent: false,
-          error: err.message,
-        });
-      }
+      matchedTenants.push({ ...tenant });
+      tenants[i] = {
+        ...tenant,
+        expiryReminderSentAt: new Date().toISOString(),
+      };
     }
 
-    if (appState) {
-      await saveState(supabase, { ...appState, tenants });
+    console.log(`line-reminder triggered, checked=${tenants.length}, matched=${matchedTenants.length}`);
+
+    if (!matchedTenants.length) {
+      return json(200, {
+        ok: true,
+        checked: tenants.length,
+        matched: 0,
+        sent: 0,
+        skipped,
+        results: [],
+        message: '目前沒有符合 7 天內提醒條件的租戶。',
+      });
     }
 
-    console.log('matched:', matched);
-    console.log('sent:', sent);
-    console.log('skipped:', JSON.stringify(skipped, null, 2));
-    console.log('results:', JSON.stringify(results, null, 2));
+    const message = buildAdminMessage(matchedTenants);
+    await pushMessage(adminUserId, LINE_CHANNEL_ACCESS_TOKEN, message);
+    await saveState(supabase, { ...appState, tenants });
+
+    const results = matchedTenants.map((tenant) => ({
+      name: tenant.name,
+      spotNumber: tenant.spotNumber,
+      contractEnd: tenant.contractEnd,
+      sent: true,
+    }));
+
+    console.log('line-reminder finished:', JSON.stringify(results, null, 2));
 
     return json(200, {
       ok: true,
-      checked,
-      matched,
-      sent,
+      checked: tenants.length,
+      matched: matchedTenants.length,
+      sent: 1,
       skipped,
       results,
+      message: `已發送 1 則管理員提醒，內含 ${matchedTenants.length} 位 7 天內到期租戶。`,
     });
   } catch (err) {
-    console.error('❌ line-reminder failed:', err);
-    return json(500, { error: err.message });
+    console.error('line-reminder failed:', err);
+    return json(500, { error: err.message || '提醒執行失敗' });
   }
 };
